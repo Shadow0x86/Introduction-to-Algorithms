@@ -14,20 +14,18 @@ namespace lyf
 	template<typename Iter, typename Key>
 	struct _Heap_traits<_HeapMax, Iter, Key>
 	{
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 		INLINE static bool compare(Iter it1, Iter it2, Key key)
 		{
-			return K::get(key, *it2) < K::get(key, *it1);
+			return iter_less(it2, it1, key);
 		}
 	};
 
 	template<typename Iter, typename Key>
 	struct _Heap_traits<_HeapMin, Iter, Key>
 	{
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 		INLINE static bool compare(Iter it1, Iter it2, Key key)
 		{
-			return K::get(key, *it1) < K::get(key, *it2);
+			return iter_less(it1, it2, key);
 		}
 	};
 

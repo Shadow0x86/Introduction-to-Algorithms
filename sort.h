@@ -116,14 +116,13 @@ namespace lyf
 		if (!_isValidRange(begin, end))
 			return;
 
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 		auto before_end = end - 1;
 		for (auto outerit = begin; outerit != before_end; outerit++)
 		{
 			for (auto innerit = before_end; innerit != outerit; innerit--)
 			{
 				auto prev = innerit - 1;
-				if (K::get(key, *innerit) < K::get(key, *prev))
+				if (iter_less(innerit, prev))
 				{
 					swap_by_iter(perv, innerit);
 				}
@@ -157,13 +156,13 @@ namespace lyf
 
 			while (mid_first != begin)
 			{
-				if (equals(mid_first - 1, mid_first, key))
+				if (iter_equal(mid_first - 1, mid_first, key))
 					mid_first--;
 				else
 					break;
 			}
 			
-			while (++mid_last != end && equals(mid_first, mid_last, key));
+			while (++mid_last != end && iter_equal(mid_first, mid_last, key));
 
 			Iter left_it = mid_first, right_it = mid_last;
 			while (1)
@@ -171,20 +170,20 @@ namespace lyf
 				if (left_it == begin)
 					break;
 				--left_it;
-				if (equals(left_it, mid_first, key))
+				if (iter_equal(left_it, mid_first, key))
 				{
 					swap_by_iter(--mid_first, left_it);
 					continue;
 				}
-				else if (less(mid_first, left_it, key))
+				else if (iter_less(mid_first, left_it, key))
 				{
 					while (right_it != end)
 					{
-						if (equals(right_it, mid_first, key))
+						if (iter_equal(right_it, mid_first, key))
 						{
 							swap_by_iter(mid_last++, right_it);
 						}
-						else if (less(right_it, mid_first, key))
+						else if (iter_less(right_it, mid_first, key))
 							break;
 						right_it++;
 					}
@@ -214,11 +213,11 @@ namespace lyf
 			
 			while (right_it != end)
 			{
-				if (equals(right_it, mid_first, key))
+				if (iter_equal(right_it, mid_first, key))
 				{
 					swap_by_iter(mid_last++, right_it);
 				}
-				else if (less(right_it, mid_first, key))
+				else if (iter_less(right_it, mid_first, key))
 				{
 					if (mid_last == right_it)
 						swap_by_iter(mid_first, mid_last);
@@ -250,8 +249,8 @@ namespace lyf
 
 
 
-	template<typename Iter, typename key_result, typename OutIter, typename Key = void*>
-	void counting_sort(Iter begin, Iter end, key_result limit, OutIter out, Key key = nullptr)
+	template<typename Iter, typename KeyResult, typename OutIter, typename Key = void*>
+	void counting_sort(Iter begin, Iter end, KeyResult limit, OutIter out, Key key = nullptr)
 	{	// Sort range [begin, end) in O(nlgn) time stably. The key should map [begin, end) to [0, limit).
 		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 
@@ -260,12 +259,12 @@ namespace lyf
 		if (limit <= 1)
 			return;
 
-		key_result *tp = new key_result[limit];
-		for (key_result i = 0; i < limit; i++)
+		KeyResult *tp = new KeyResult[limit];
+		for (KeyResult i = 0; i < limit; i++)
 			tp[i] = 0;
 		for (auto it = begin; it != end; it++)
 			tp[K::get(key, *it)]++;
-		for (key_result i = 1; i < limit; i++)
+		for (KeyResult i = 1; i < limit; i++)
 			tp[i] += tp[i - 1];
 		Iter it = end - 1;
 		while (1)
@@ -298,7 +297,7 @@ namespace lyf
 		{
 			maxit = begin;
 			minit = begin + 1;
-			if (less(maxit, minit, key))
+			if (iter_less(maxit, minit, key))
 			{
 				maxit = minit;
 				minit = begin;
@@ -309,12 +308,12 @@ namespace lyf
 		while (it1 != end)
 		{
 			it2 = it1 + 1;
-			bool b = less(it2, it1, key);
+			bool b = iter_less(it2, it1, key);
 			Iter _maxit = b ? it1 : it2;
 			Iter _minit = b ? it2 : it1;
-			if (less(maxit, _maxit, key))
+			if (iter_less(maxit, _maxit, key))
 				maxit = _maxit;
-			if (less(_minit, minit, key))
+			if (iter_less(_minit, minit, key))
 				minit = _minit;
 			it1 += 2;
 		}

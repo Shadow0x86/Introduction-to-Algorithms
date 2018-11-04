@@ -6,15 +6,17 @@
 #define INLINE inline
 #define MOVE std::move
 #define DEBUG 0
+#define LOG_CONST_ASSIGN
 
-
-using std::cout;
-using std::cin;
-using std::endl;
 
 
 namespace lyf
 {
+	using std::cout;
+	using std::cin;
+	using std::endl;
+
+
 	template<typename Iter>
 	INLINE bool _isValidRange(Iter begin, Iter end)
 	{
@@ -351,21 +353,21 @@ namespace lyf
 
 
 	template<typename Iter, typename Key = void*>
-	INLINE bool less(Iter left, Iter right, Key key = nullptr)
+	INLINE bool iter_less(Iter left, Iter right, Key key = nullptr)
 	{
 		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 		return K::get(key, *left) < K::get(key, *right);
 	}
 
 	template<typename Iter, typename Key = void*>
-	INLINE bool greater(Iter left, Iter right, Key key = nullptr)
+	INLINE bool iter_greater(Iter left, Iter right, Key key = nullptr)
 	{
 		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 		return K::get(key, *right) < K::get(key, *left);
 	}
 
 	template<typename Iter, typename Key = void*>
-	INLINE bool equals(Iter left, Iter right, Key key = nullptr)
+	INLINE bool iter_equal(Iter left, Iter right, Key key = nullptr)
 	{
 		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
 		return K::get(key, *left) == K::get(key, *right);
@@ -390,62 +392,59 @@ namespace lyf
 		return sp;
 	}
 
-	extern int cnt_copy_constructor = 0;
-	extern int cnt_move_constructor = 0;
-	extern int cnt_copy_assign = 0;
-	extern int cnt_move_assign = 0;
+	
 
-	extern bool islog = false;
-
-	void reset_count()
+	class TestClass
 	{
-		cnt_copy_constructor = 0;
-		cnt_move_constructor = 0;
-		cnt_copy_assign = 0;
-		cnt_move_assign = 0;
-	}
+#ifdef LOG_CONST_ASSIGN
+	private:
+		static int cnt_copy_constructor;
+		static int cnt_move_constructor;
+		static int cnt_copy_assign;
+		static int cnt_move_assign;
 
-	void show_count()
-	{
-		cout << cnt_copy_constructor << endl;
-		cout << cnt_move_constructor << endl;
-		cout << cnt_copy_assign << endl;
-		cout << cnt_move_assign << endl;
-	}
-
-	class Person
-	{
 	public:
-		Person() : name(nullptr) {}
-		Person(string *name) : name(name) {}
-		~Person() { delete name; }
-		Person(const Person &rhs)
+		static void reset_count()
+		{
+			cnt_copy_constructor = 0;
+			cnt_move_constructor = 0;
+			cnt_copy_assign = 0;
+			cnt_move_assign = 0;
+		}
+		static void show_count()
+		{
+			cout << cnt_copy_constructor << endl;
+			cout << cnt_move_constructor << endl;
+			cout << cnt_copy_assign << endl;
+			cout << cnt_move_assign << endl;
+		}
+#endif
+
+	public:
+		TestClass() : name(nullptr) {}
+		TestClass(string *name) : name(name) {}
+		~TestClass() { delete name; }
+		TestClass(const TestClass &rhs)
 			: name(new string(*rhs.name))
 		{
-			//if (islog)
-			//	cnt_copy_constructor++;
-#ifdef PRINT_CONSTRUCTOR
-			cout << "Person(const Person &rhs)" << endl;
-#endif // PRINT_CONSTRUCTOR
+#ifdef LOG_CONST_ASSIGN
+			cnt_copy_constructor++;
+#endif
 		}
-		Person(Person &&rhs)
+		TestClass(TestClass &&rhs)
 			: name(rhs.name)
 		{
-			//if (islog)
-			//	cnt_move_constructor++;
-#ifdef PRINT_CONSTRUCTOR
-			cout << "Person(Person &&rhs)" << endl;
-#endif // PRINT_CONSTRUCTOR
+#ifdef LOG_CONST_ASSIGN
+			cnt_move_constructor++;
+#endif
 			rhs.name = nullptr;
 		}
 
-		Person &operator=(const Person &rhs)
+		TestClass &operator=(const TestClass &rhs)
 		{
-			//if (islog)
-			//	cnt_copy_assign++;
-#ifdef PRINT_CONSTRUCTOR
-			cout << "Person &operator=(const Person &rhs)" << endl;
-#endif // PRINT_CONSTRUCTOR
+#ifdef LOG_CONST_ASSIGN
+			cnt_copy_assign++;
+#endif
 			if (&rhs != this)
 			{
 				delete name;
@@ -453,13 +452,11 @@ namespace lyf
 			}
 			return *this;
 		}
-		Person &operator=(Person &&rhs)
+		TestClass &operator=(TestClass &&rhs)
 		{
-			//if (islog)
-			//	cnt_move_assign++;
-#ifdef PRINT_CONSTRUCTOR
-			cout << "Person &operator=(Person &&rhs)" << endl;
-#endif // PRINT_CONSTRUCTOR
+#ifdef LOG_CONST_ASSIGN
+			cnt_move_assign++;
+#endif
 			if (&rhs != this)
 			{
 				delete name;
@@ -469,27 +466,27 @@ namespace lyf
 			return *this;
 		}
 
-		bool operator<(const Person &rhs) const
+		bool operator<(const TestClass &rhs) const
 		{
 			return (*name) < (*rhs.name);
 		}
-		bool operator<=(const Person &rhs) const
+		bool operator<=(const TestClass &rhs) const
 		{
 			return (*name) <= (*rhs.name);
 		}
-		bool operator>(const Person &rhs) const
+		bool operator>(const TestClass &rhs) const
 		{
 			return rhs < *this;
 		}
-		bool operator>=(const Person &rhs) const
+		bool operator>=(const TestClass &rhs) const
 		{
 			return rhs <= *this;
 		}
-		bool operator==(const Person &rhs) const
+		bool operator==(const TestClass &rhs) const
 		{
 			return *name == *rhs.name;
 		}
-		bool operator!=(const Person &rhs) const
+		bool operator!=(const TestClass &rhs) const
 		{
 			return !(*this == rhs);
 		}
@@ -503,9 +500,14 @@ namespace lyf
 		string * name = nullptr;
 	};
 
-	std::ostream &operator<<(std::ostream &out, const Person &p)
+	int TestClass::cnt_copy_constructor = 0;
+	int TestClass::cnt_move_constructor = 0;
+	int TestClass::cnt_copy_assign = 0;
+	int TestClass::cnt_move_assign = 0;
+
+	std::ostream &operator<<(std::ostream &out, const TestClass &p)
 	{
-		out << "Person(" << p.getName() << ")";
+		out << "TestClass(" << p.getName() << ")";
 		return out;
 	}
 
@@ -526,9 +528,9 @@ namespace lyf
 	};
 
 	template<>
-	struct TestType<Person>
+	struct TestType<TestClass>
 	{
-		static Person newObj() { return Person(randstring()); }
+		static TestClass newObj() { return TestClass(randstring()); }
 	};
 
 
