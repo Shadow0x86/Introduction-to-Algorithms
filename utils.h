@@ -1,12 +1,17 @@
 #pragma once
 #include <cassert>
 #include <iostream>
+#include <chrono>
+#include <utility>
 
 
 #define INLINE inline
 #define MOVE std::move
 #define DEBUG 0
-#define LOG_CONST_ASSIGN
+//#define LOG_CONST_ASSIGN
+
+
+using namespace std::chrono;
 
 
 
@@ -32,7 +37,7 @@ namespace lyf
 	}
 
 	template<typename Key, typename T>
-	struct _Sort_Key
+	struct _Predicate
 	{
 		INLINE static auto get(Key key, const T &v) -> decltype(key(v))
 		{
@@ -41,7 +46,7 @@ namespace lyf
 	};
 
 	template<typename T>
-	struct _Sort_Key<void*, T>
+	struct _Predicate<void*, T>
 	{
 		INLINE static const T &get(void* key, const T &v)
 		{
@@ -114,7 +119,7 @@ namespace lyf
 			_ensureValidCurrent();
 			return *this;
 		}
-		INLINE ReversePtr operator++(difference_type)
+		INLINE ReversePtr operator++(int)
 		{
 			auto tmp = *this;
 			++*this;
@@ -126,7 +131,7 @@ namespace lyf
 			_ensureValidCurrent();
 			return *this;
 		}
-		INLINE ReversePtr operator--(difference_type)
+		INLINE ReversePtr operator--(int)
 		{
 			auto tmp = *this;
 			--*this;
@@ -355,21 +360,21 @@ namespace lyf
 	template<typename Iter, typename Key = void*>
 	INLINE bool iter_less(Iter left, Iter right, Key key = nullptr)
 	{
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
+		using K = _Predicate<Key, typename Iter_traits<Iter>::value_type>;
 		return K::get(key, *left) < K::get(key, *right);
 	}
 
 	template<typename Iter, typename Key = void*>
 	INLINE bool iter_greater(Iter left, Iter right, Key key = nullptr)
 	{
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
+		using K = _Predicate<Key, typename Iter_traits<Iter>::value_type>;
 		return K::get(key, *right) < K::get(key, *left);
 	}
 
 	template<typename Iter, typename Key = void*>
 	INLINE bool iter_equal(Iter left, Iter right, Key key = nullptr)
 	{
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
+		using K = _Predicate<Key, typename Iter_traits<Iter>::value_type>;
 		return K::get(key, *left) == K::get(key, *right);
 	}
 
@@ -422,7 +427,7 @@ namespace lyf
 
 	public:
 		TestClass() : name(nullptr) {}
-		TestClass(string *name) : name(name) {}
+		explicit TestClass(string *name) : name(name) {}
 		~TestClass() { delete name; }
 		TestClass(const TestClass &rhs)
 			: name(new string(*rhs.name))
@@ -500,10 +505,12 @@ namespace lyf
 		string * name = nullptr;
 	};
 
+#ifdef LOG_CONST_ASSIGN
 	int TestClass::cnt_copy_constructor = 0;
 	int TestClass::cnt_move_constructor = 0;
 	int TestClass::cnt_copy_assign = 0;
 	int TestClass::cnt_move_assign = 0;
+#endif
 
 	std::ostream &operator<<(std::ostream &out, const TestClass &p)
 	{

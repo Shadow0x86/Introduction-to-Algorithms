@@ -26,7 +26,7 @@ namespace lyf
 		if (!_isValidRange(begin, end))
 			return;
 
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
+		using K = _Predicate<Key, typename Iter_traits<Iter>::value_type>;
 
 		for (auto outerit = begin + 1; outerit != end; outerit++)
 		{
@@ -57,7 +57,7 @@ namespace lyf
 			return;
 
 		using E = typename Iter_traits<Iter>::value_type;
-		using K = _Sort_Key<Key, E>;
+		using K = _Predicate<Key, E>;
 
 		if (end - begin <= 100)
 			return insertion_sort(begin, end, key);
@@ -252,7 +252,7 @@ namespace lyf
 	template<typename Iter, typename KeyResult, typename OutIter, typename Key = void*>
 	void counting_sort(Iter begin, Iter end, KeyResult limit, OutIter out, Key key = nullptr)
 	{	// Sort range [begin, end) in O(nlgn) time stably. The key should map [begin, end) to [0, limit).
-		using K = _Sort_Key<Key, typename Iter_traits<Iter>::value_type>;
+		using K = _Predicate<Key, typename Iter_traits<Iter>::value_type>;
 
 		if (end - begin <= 1)
 			return;

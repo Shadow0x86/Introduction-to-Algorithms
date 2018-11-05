@@ -180,14 +180,12 @@ namespace lyf
 	template<typename HeapType,
 		typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
+		typename Container = std::vector<Ele>>
 	class BasePriorityQueue
 	{	// priority queue by heap
 	private:
 		using value_type = Ele;
-		using container = Container<value_type, Allocator>;
-		using iter_type = typename container::iterator;
+		using iter_type = typename Container::iterator;
 		using heap_type = BaseHeap<HeapType, iter_type, Key>;
 	public:
 		explicit BasePriorityQueue(Key key = nullptr)
@@ -203,7 +201,7 @@ namespace lyf
 
 		template<typename Iter>
 		BasePriorityQueue(Iter begin, Iter end, Key key = nullptr)
-			: heap(heap_type(key)), data(container(begin, end))
+			: heap(heap_type(key)), data(Container(begin, end))
 		{
 			reset_heap();
 			heap.build();
@@ -238,7 +236,7 @@ namespace lyf
 		bool empty() const { return size() == 0; }
 
 	private:
-		container data;
+		Container data;
 		heap_type heap;
 
 		bool reset_heap()
@@ -251,71 +249,63 @@ namespace lyf
 
 	template<typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
-	using MaxPriorityQueue = BasePriorityQueue<_HeapMax, Ele, Key, Container, Allocator>;
+		typename Container = std::vector<Ele>>
+	using MaxPriorityQueue = BasePriorityQueue<_HeapMax, Ele, Key, Container>;
 
 	template<typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
-	using MinPriorityQueue = BasePriorityQueue<_HeapMin, Ele, Key, Container, Allocator>;
+		typename Container = std::vector<Ele>>
+	using MinPriorityQueue = BasePriorityQueue<_HeapMin, Ele, Key, Container>;
 
 	template<typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>,
+		typename Container = std::vector<Ele>,
 		typename X = typename std::enable_if<std::is_class_v<Key> || std::is_pointer_v<Key>>::type>
 	auto newMaxPriorityQueue(Key key = nullptr)
 	{
-		return MaxPriorityQueue<Ele, Key, Container, Allocator>(key);
+		return MaxPriorityQueue<Ele, Key, Container>(key);
 	}
 
 	template<typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
+		typename Container = std::vector<Ele>>
 	auto newMaxPriorityQueue(size_t init_cap, Key key = nullptr)
 	{
-		return MaxPriorityQueue<Ele, Key, Container, Allocator>(init_cap, key);
+		return MaxPriorityQueue<Ele, Key, Container>(init_cap, key);
 	}
 
 	template<typename Ele,
 		typename Iter,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
+		typename Container = std::vector<Ele>>
 	auto newMaxPriorityQueue(Iter begin, Iter end, Key key = nullptr)
 	{
-		return MaxPriorityQueue<Ele, Key, Container, Allocator>(begin, end, key);
+		return MaxPriorityQueue<Ele, Key, Container>(begin, end, key);
 	}
 
 	template<typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>,
+		typename Container = std::vector<Ele>,
 		typename X = typename std::enable_if<std::is_class_v<Key> || std::is_pointer_v<Key>>::type>
 	auto newMinPriorityQueue(Key key = nullptr)
 	{
-		return MinPriorityQueue<Ele, Key, Container, Allocator>(key);
+		return MinPriorityQueue<Ele, Key, Container>(key);
 	}
 
 	template<typename Ele,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
+		typename Container = std::vector<Ele>>
 	auto newMinPriorityQueue(size_t init_cap, Key key = nullptr)
 	{
-		return MinPriorityQueue<Ele, Key, Container, Allocator>(init_cap, key);
+		return MinPriorityQueue<Ele, Key, Container>(init_cap, key);
 	}
 
 	template<typename Ele,
 		typename Iter,
 		typename Key = void*,
-		template<typename, typename> typename Container = std::vector,
-		typename Allocator = std::allocator<Ele>>
+		typename Container = std::vector<Ele>>
 	auto newMinPriorityQueue(Iter begin, Iter end, Key key = nullptr)
 	{
-		return MinPriorityQueue<Ele, Key, Container, Allocator>(begin, end, key);
+		return MinPriorityQueue<Ele, Key, Container>(begin, end, key);
 	}
 }
