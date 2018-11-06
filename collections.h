@@ -114,17 +114,30 @@ namespace lyf
 	template<typename T>
 	class ForwardLinkedList : public _AbsColl<T>
 	{
-	protected:
+	public:
+		class Node;
+#if DEBUG
+		using nodeptr = std::shared_ptr<Node>;
+#else
+		using nodeptr = Node * ;
+#endif
+		
 		class Node
 		{
 			template<typename T>
 			friend class ForwardLinkedList;
 		public:
-			Node *next() const
+			nodeptr next() const
 			{
+#if DEBUG
+				if (!_in_list)
+					throw std::runtime_error("The node is not in list!");
+#endif
 				return _next;
 			}
+
 			T value;
+
 		private:
 			Node(const T &value)
 				: value(value)
@@ -141,8 +154,12 @@ namespace lyf
 			{
 			}
 
-			Node *_next = nullptr;
+			nodeptr _next = nullptr;
+#if DEBUG
+			bool _in_list = true;
+#endif
 		};
+
 	public:
 		ForwardLinkedList() {}
 		//ForwardLinkedList(const ForwardLinkedList &rhs);
@@ -173,58 +190,77 @@ namespace lyf
 		}
 		void reverse()
 		{
-			if (size() <= 1)
+			if (_size <= 1)
 				return;
 			//TODO
 		}
 		void clear()
 		{
+#if DEBUG
+			nodeptr curr = _head, np = _head;
+			_head.reset();
+			while (np)
+			{
+				np = curr->_next;
+				if (curr.use_count() > 1)
+				{
+					curr->_in_list = false;
+					curr->_next.reset();
+				}
+				curr = np;
+			}
+#else
 			while (_head)
 			{
-				Node *next = _head->_next;
+				nodeptr next = _head->_next;
 				delete _head;
 				_head = next;
 			}
+#endif
 			_size = 0;
 		}
 		T head() const
 		{
 			return _head->value;
 		}
-		Node *head_node() const
+		nodeptr head_node() const
 		{
 			return _head;
 		}
 
 		void push(const T &value)
 		{
-			_add_node(new Node(value));
+			_add_node_front(new Node(value));
 		}
 		void push(T &&value)
 		{
-			_add_node(new Node(std::move(value)));
+			_add_node_front(new Node(std::move(value)));
 		}
 
 		template<typename... Types>
 		void emplace(Types&&... args)
 		{
-			_add_node(new Node(std::forward<Types>(args)...));
+			_add_node_front(new Node(std::forward<Types>(args)...));
 		}
 
 		T pop()
 		{
 			T ret = _head->value;
-			Node *oh = _head;
+			nodeptr oh = _head;
 			_head = _head->_next;
+#if DEBUG
+			oh.reset();
+#else
 			delete oh;
+#endif
 			_size--;
 			return ret;
 		}
 
-		Node *search(const T &value)
+		nodeptr search(const T &value)
 		{
-			Node *ret = nullptr;
-			Node *node = _head;
+			nodeptr ret = nullptr;
+			nodeptr node = _head;
 			while (node)
 			{
 				if (node->value == value)
@@ -236,20 +272,127 @@ namespace lyf
 			}
 			return ret;
 		}
-		//void insert(Node *node, const T &value);
-		//void remove(Node *node);
-		//void remove(const T &value);
+		bool insert(nodeptr node, const T &value)
+		{	// insert a value before the node
+			bool ret = false;
+			nodeptr curr = _head, prev = nullptr;
+			while (curr)
+			{
+				if (curr == node)
+				{
+#if DEBUG
+					nodeptr new_node(new Node(value));
+#else
+					nodeptr new_node = new Node(value);
+#endif
+					new_node->_next = curr;
+					if (prev)
+						prev->_next = new_node;
+					else
+						_head = new_node;
+					ret = true;
+					break;
+				}
+				prev = curr;
+				curr = curr->_next;
+			}
+			return ret;
+		}
+		bool remove(nodeptr node)
+		{
+			bool ret = false;
+			nodeptr curr = _head, prev = nullptr;
+			while (curr)
+			{
+				if (curr == node)
+				{
+#if DEBUG
+					curr->_in_list = false;
+#endif
+					nodeptr next = curr->_next;
+					curr = nullptr;
+					if (prev)
+						prev->_next = next;
+					else
+						_head = next;
+					ret = true;
+					break;
+				}
+				prev = curr;
+				curr = curr->_next;
+			}
+			return ret;
+		}
+		bool remove(const T &value)
+		{
+			bool ret = false;
+			nodeptr curr = _head, prev = nullptr;
+			while (curr)
+			{
+				if (curr->value == value)
+				{
+#if DEBUG
+					curr->_in_list = false;
+#endif
+					nodeptr next = curr->_next;
+					curr = nullptr;
+					if (prev)
+						prev->_next = next;
+					else
+						_head = next;
+					ret = true;
+					break;
+				}
+				prev = curr;
+				curr = curr->_next;
+			}
+			return ret;
+		}
+		size_t remove_all(const T &value)
+		{
+			size_t count = 0;
+			nodeptr curr = _head, prev = nullptr;
+			while (curr)
+			{
+				if (curr->value == value)
+				{
+#if DEBUG
+					curr->_in_list = false;
+#endif
+					nodeptr next = curr->_next;
+					curr = nullptr;
+					if (prev)
+						prev->_next = next;
+					else
+						_head = next;
+					count++;
+					curr = next;
+				}
+				else
+				{
+					prev = curr;
+					curr = curr->_next;
+				}
+			}
+			return count;
+		}
 		
 
 	protected:
 		size_t _size = 0;
-		Node *_head = nullptr;
+		nodeptr _head = nullptr;
 
-		void _add_node(Node *node)
+		void _add_node_front(Node *node)
 		{
 			node->_next = _head;
+#if DEBUG
+			_head.reset(node);
+#else
 			_head = node;
+#endif
 			_size++;
 		}
 	};
+
 }
+

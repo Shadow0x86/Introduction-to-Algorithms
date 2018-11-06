@@ -7,7 +7,7 @@
 
 #define INLINE inline
 #define MOVE std::move
-#define DEBUG 0
+#define DEBUG 1
 //#define LOG_CONST_ASSIGN
 
 
@@ -385,16 +385,16 @@ namespace lyf
 		return rand() % max;
 	}
 
-	string *randstring(size_t min_len = 1, size_t max_len = 40)
+	string randstring(size_t min_len = 1, size_t max_len = 40)
 	{
 		size_t len = randint(max_len - min_len + 1) + min_len;
 		char *cp = new char[len + 1];
 		for (size_t i = 0; i != len; i++)
 			cp[i] = randint(127 - 33) + 33;
 		cp[len] = 0;
-		string *sp = new string(cp);
+		string s(cp);
 		delete[] cp;
-		return sp;
+		return s;
 	}
 
 	
@@ -427,8 +427,8 @@ namespace lyf
 
 	public:
 		TestClass() : name(nullptr) {}
-		explicit TestClass(string *name) : name(name) {}
-		~TestClass() { delete name; }
+		explicit TestClass(const string &name) : name(new string(name)) { cout << "construct " << name << endl; }
+		~TestClass() { cout << "destroy " << *name << endl; delete name; }
 		TestClass(const TestClass &rhs)
 			: name(new string(*rhs.name))
 		{
