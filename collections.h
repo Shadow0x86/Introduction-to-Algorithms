@@ -1,6 +1,7 @@
 #pragma once
 #include <vector>
 #include <deque>
+#include "utils.h"
 
 
 namespace lyf
@@ -129,35 +130,43 @@ namespace lyf
 		public:
 			nodeptr next() const
 			{
-#if DEBUG
-				if (!_in_list)
-					throw std::runtime_error("The node is not in list!");
-#endif
+				_ensureValid();
 				return _next;
 			}
-
-			T value;
-
+			T &value()
+			{
+				_ensureValid();
+				return _value;
+			}
+			
 		private:
 			Node(const T &value)
-				: value(value)
+				: _value(value)
 			{
 			}
 			Node(T &&value)
-				: value(std::move(value))
+				: _value(std::move(value))
 			{
 			}
 
 			template<typename... Types>
 			Node(Types&&... args)
-				: value(std::forward<Types>(args)...)
+				: _value(std::forward<Types>(args)...)
 			{
 			}
 
+			T _value;
 			nodeptr _next = nullptr;
 #if DEBUG
 			bool _in_list = true;
 #endif
+			void _ensureValid() const
+			{
+#if DEBUG
+				if (!_in_list)
+					throw std::runtime_error("The node is not in list!");
+#endif
+			}
 		};
 
 	public:
@@ -245,7 +254,7 @@ namespace lyf
 
 		T pop()
 		{
-			T ret = _head->value;
+			T ret = _head->_value;
 			nodeptr oh = _head;
 			_head = _head->_next;
 #if DEBUG
@@ -263,7 +272,7 @@ namespace lyf
 			nodeptr node = _head;
 			while (node)
 			{
-				if (node->value == value)
+				if (node->_value == value)
 				{
 					ret = node;
 					break;
@@ -329,7 +338,7 @@ namespace lyf
 			nodeptr curr = _head, prev = nullptr;
 			while (curr)
 			{
-				if (curr->value == value)
+				if (curr->_value == value)
 				{
 #if DEBUG
 					curr->_in_list = false;
@@ -354,7 +363,7 @@ namespace lyf
 			nodeptr curr = _head, prev = nullptr;
 			while (curr)
 			{
-				if (curr->value == value)
+				if (curr->_value == value)
 				{
 #if DEBUG
 					curr->_in_list = false;

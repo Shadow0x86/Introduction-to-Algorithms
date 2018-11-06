@@ -1,6 +1,7 @@
 #pragma once
 #include <cassert>
 #include <iostream>
+#include <string>
 #include <chrono>
 #include <utility>
 
@@ -20,6 +21,7 @@ namespace lyf
 	using std::cout;
 	using std::cin;
 	using std::endl;
+	using std::string;
 
 
 	template<typename Iter>
@@ -427,8 +429,17 @@ namespace lyf
 
 	public:
 		TestClass() : name(nullptr) {}
-		explicit TestClass(const string &name) : name(new string(name)) { cout << "construct " << name << endl; }
-		~TestClass() { cout << "destroy " << *name << endl; delete name; }
+		explicit TestClass(const string &name)
+			:name(new string(name))
+		{
+			cout << "construct " << name << endl;
+		}
+		~TestClass()
+		{
+			if (name)
+				cout << "destroy " << *name << endl;
+			delete name;
+		}
 		TestClass(const TestClass &rhs)
 			: name(new string(*rhs.name))
 		{
