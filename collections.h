@@ -111,63 +111,97 @@ namespace lyf
 		}
 	};
 
+	template<typename T>
+	class ForwardLinkedList;
+
+	template<typename T>
+	class ForwardLinkedListNode
+	{
+		friend class ForwardLinkedList<T>;
+	public:
+#if DEBUG
+		using nodeptr = std::shared_ptr<ForwardLinkedListNode>;
+#else
+		using nodeptr = ForwardLinkedListNode * ;
+#endif
+		virtual ~ForwardLinkedListNode() {}
+
+		nodeptr next() const
+		{
+			_ensureValid();
+			return _next;
+		}
+		T &value()
+		{
+			_ensureValid();
+			return _value;
+		}
+
+	protected:
+		ForwardLinkedListNode(const T &value)
+			: _value(value)
+		{
+		}
+		ForwardLinkedListNode(T &&value)
+			: _value(std::move(value))
+		{
+		}
+
+		template<typename... Types>
+		ForwardLinkedListNode(Types&&... args)
+			: _value(std::forward<Types>(args)...)
+		{
+		}
+
+		T _value;
+		nodeptr _next = nullptr;
+#if DEBUG
+		bool _in_list = true;
+#endif
+		void _ensureValid() const
+		{
+#if DEBUG
+			if (!_in_list)
+				throw std::runtime_error("The node is not in list!");
+#endif
+		}
+	};
+
+	template<typename T>
+	class LinkedList;
+
+	template<typename T>
+	class LinkedListNode : public ForwardLinkedListNode<T>
+	{
+		friend class LinkedList<T>;
+	public:
+#if DEBUG
+		using nodeptr = std::shared_ptr<LinkedListNode>;
+#else
+		using nodeptr = LinkedListNode * ;
+#endif
+		
+		nodeptr prev() const
+		{
+			this->_ensureValid();
+			return _prev;
+		}
+
+	private:
+		nodeptr _prev = nullptr;
+	};
+
 
 	template<typename T>
 	class ForwardLinkedList : public _AbsColl<T>
 	{
 	public:
-		class Node;
+		using Node = ForwardLinkedListNode<T>;
 #if DEBUG
 		using nodeptr = std::shared_ptr<Node>;
 #else
 		using nodeptr = Node * ;
 #endif
-		
-		class Node
-		{
-			template<typename T>
-			friend class ForwardLinkedList;
-		public:
-			nodeptr next() const
-			{
-				_ensureValid();
-				return _next;
-			}
-			T &value()
-			{
-				_ensureValid();
-				return _value;
-			}
-			
-		private:
-			Node(const T &value)
-				: _value(value)
-			{
-			}
-			Node(T &&value)
-				: _value(std::move(value))
-			{
-			}
-
-			template<typename... Types>
-			Node(Types&&... args)
-				: _value(std::forward<Types>(args)...)
-			{
-			}
-
-			T _value;
-			nodeptr _next = nullptr;
-#if DEBUG
-			bool _in_list = true;
-#endif
-			void _ensureValid() const
-			{
-#if DEBUG
-				if (!_in_list)
-					throw std::runtime_error("The node is not in list!");
-#endif
-			}
-		};
 
 	public:
 		ForwardLinkedList() {}
@@ -181,7 +215,7 @@ namespace lyf
 			rhs._size = 0;
 			rhs._head = nullptr;
 		}
-		~ForwardLinkedList()
+		virtual ~ForwardLinkedList()
 		{
 			_destroy();
 		}
@@ -213,7 +247,7 @@ namespace lyf
 		{
 			return _size;
 		}
-		void reverse()
+		virtual void reverse()
 		{
 			if (_size <= 1)
 				return;
@@ -459,6 +493,19 @@ namespace lyf
 			}
 #endif
 		}
+	};
+
+	template<typename T>
+	class LinkedList :public ForwardLinkedList<T>
+	{
+	public:
+		using Node = LinkedListNode<T>;
+#if DEBUG
+		using nodeptr = std::shared_ptr<Node>;
+#else
+		using nodeptr = Node * ;
+#endif
+
 	};
 
 }
