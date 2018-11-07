@@ -271,20 +271,10 @@ namespace lyf
 			return ret;
 		}
 
-		nodeptr search(const T &value)
+		nodeptr search(const T &value) const
 		{
-			nodeptr ret = nullptr;
-			nodeptr node = _head;
-			while (node)
-			{
-				if (node->_value == value)
-				{
-					ret = node;
-					break;
-				}
-				node = node->_next;
-			}
-			return ret;
+			auto find = this->_find_node_and_prev(value);
+			return find.first;
 		}
 		bool insert(nodeptr node, const T &value)
 		{	// insert a value before the node
@@ -423,7 +413,7 @@ namespace lyf
 			return new_head;
 		}
 
-		std::pair<nodeptr, nodeptr> _find_node_and_prev(const nodeptr &tofind)
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(const nodeptr &tofind) const
 		{
 			nodeptr node = _head, prev = nullptr;
 			while (node)
@@ -436,7 +426,7 @@ namespace lyf
 			return std::pair<nodeptr, nodeptr>(node, prev);
 		}
 
-		std::pair<nodeptr, nodeptr> _find_node_and_prev(const T &tofind)
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(const T &tofind) const
 		{
 			nodeptr node = _head, prev = nullptr;
 			while (node)
