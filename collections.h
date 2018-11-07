@@ -171,7 +171,10 @@ namespace lyf
 
 	public:
 		ForwardLinkedList() {}
-		//ForwardLinkedList(const ForwardLinkedList &rhs);
+		ForwardLinkedList(const ForwardLinkedList &rhs)
+			: _size(rhs._size), _head(ForwardLinkedList::_copy(rhs))
+		{
+		}
 		ForwardLinkedList(ForwardLinkedList &&rhs)
 			: _size(rhs._size), _head(rhs._head)
 		{
@@ -189,7 +192,7 @@ namespace lyf
 			{
 				_destroy();
 				_size = rhs._size;
-
+				_head = ForwardLinkedList::_copy(rhs);
 			}
 			return *this;
 		}
@@ -391,6 +394,33 @@ namespace lyf
 			_head = node;
 #endif
 			_size++;
+		}
+
+		static nodeptr _copy(const ForwardLinkedList &rhs)
+		{
+			nodeptr new_head, curr;
+			nodeptr nd = rhs.head_node();
+			if (nd)
+			{
+#if DEBUG
+				new_head.reset(new Node(nd->_value));
+#else
+				new_head = new Node(nd->_value);
+#endif
+				curr = new_head;
+				nd = nd->_next;
+			}
+			while (nd)
+			{
+#if DEBUG
+				curr->_next.reset(new Node(nd->_value));
+#else
+				curr->_next = new Node(nd->_value);
+#endif
+				curr = curr->_next;
+				nd = nd->_next;
+			}
+			return new_head;
 		}
 
 		std::pair<nodeptr, nodeptr> _find_node_and_prev(const nodeptr &tofind)
