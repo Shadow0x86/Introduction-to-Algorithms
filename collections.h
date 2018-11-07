@@ -178,13 +178,26 @@ namespace lyf
 			rhs._size = 0;
 			rhs._head = nullptr;
 		}
+		~ForwardLinkedList()
+		{
+			_destroy();
+		}
 
-		//ForwardLinkedList &operator=(const ForwardLinkedList &rhs);
+		ForwardLinkedList &operator=(const ForwardLinkedList &rhs)
+		{
+			if (this != &rhs)
+			{
+				_destroy();
+				_size = rhs._size;
+
+			}
+			return *this;
+		}
 		ForwardLinkedList &operator=(ForwardLinkedList &&rhs)
 		{
 			if (this != &rhs)
 			{
-				clear();
+				_destroy();
 				_head = rhs._head;
 				_size = rhs._size;
 				rhs._head = nullptr;
@@ -201,36 +214,25 @@ namespace lyf
 		{
 			if (_size <= 1)
 				return;
-			//TODO
+			nodeptr left = _head, mid = _head->_next, right;
+			_head->_next = nullptr;
+			while (mid)
+			{
+				right = mid->_next;
+				mid->_next = left;
+				left = mid;
+				mid = right;
+			}
+			_head = left;
 		}
 		void clear()
 		{
-#if DEBUG
-			nodeptr curr = _head, np = _head;
-			_head.reset();
-			while (np)
-			{
-				np = curr->_next;
-				if (curr.use_count() > 1)
-				{
-					curr->_in_list = false;
-					curr->_next.reset();
-				}
-				curr = np;
-			}
-#else
-			while (_head)
-			{
-				nodeptr next = _head->_next;
-				delete _head;
-				_head = next;
-			}
-#endif
+			_destroy();
 			_size = 0;
 		}
 		T head() const
 		{
-			return _head->value;
+			return _head->_value;
 		}
 		nodeptr head_node() const
 		{
@@ -238,22 +240,22 @@ namespace lyf
 		}
 
 		void push(const T &value)
-		{
+		{	// push the value to list head
 			_add_node_front(new Node(value));
 		}
 		void push(T &&value)
-		{
+		{	// push the value to list head
 			_add_node_front(new Node(std::move(value)));
 		}
 
 		template<typename... Types>
-		void emplace(Types&&... args)
-		{
+		void emplace_front(Types&&... args)
+		{	// construct node at list head
 			_add_node_front(new Node(std::forward<Types>(args)...));
 		}
 
 		T pop()
-		{
+		{	// pop the value at list head
 			T ret = _head->_value;
 			nodeptr oh = _head;
 			_head = _head->_next;
@@ -283,79 +285,68 @@ namespace lyf
 		}
 		bool insert(nodeptr node, const T &value)
 		{	// insert a value before the node
-			bool ret = false;
-			nodeptr curr = _head, prev = nullptr;
-			while (curr)
-			{
-				if (curr == node)
-				{
 #if DEBUG
-					nodeptr new_node(new Node(value));
+			nodeptr new_node(new Node(value));
 #else
-					nodeptr new_node = new Node(value);
+			nodeptr new_node = new Node(value);
 #endif
-					new_node->_next = curr;
-					if (prev)
-						prev->_next = new_node;
-					else
-						_head = new_node;
-					ret = true;
-					break;
-				}
-				prev = curr;
-				curr = curr->_next;
+			return _insert_node(node, new_node);
+		}
+		
+		template<typename... Types>
+		bool emplace(nodeptr node, Types... args)
+		{	// construct a value before the node
+#if DEBUG
+			nodeptr new_node(new Node(std::forward<Types>(args)...));
+#else
+			nodeptr new_node = new Node(std::forward<Types>(args)...);
+#endif
+			return _insert_node(node, new_node);
+		}
+
+		bool _insert_node(nodeptr tofind, nodeptr toinsert)
+		{
+			bool ret = false;
+			std::pair<nodeptr, nodeptr> find = this->_find_node_and_prev(tofind);
+			if (find.first || !tofind)
+			{
+				ret = true;
+				toinsert->_next = find.first;
+				if (find.second)
+					find.second->_next = toinsert;
+				else
+					_head = toinsert;
+				_size++;
+			}
+			return ret;
+		}
+		bool _remove_node(nodeptr toremove, nodeptr prev)
+		{
+			bool ret = false;
+			if (toremove)
+			{
+				if (prev)
+					prev->_next = toremove->_next;
+				else
+					_head = toremove->_next;
+#if DEBUG
+				toremove->_in_list = false;
+#endif
+				toremove->_next = nullptr;
+				_size--;
+				ret = true;
 			}
 			return ret;
 		}
 		bool remove(nodeptr node)
 		{
-			bool ret = false;
-			nodeptr curr = _head, prev = nullptr;
-			while (curr)
-			{
-				if (curr == node)
-				{
-#if DEBUG
-					curr->_in_list = false;
-#endif
-					nodeptr next = curr->_next;
-					curr = nullptr;
-					if (prev)
-						prev->_next = next;
-					else
-						_head = next;
-					ret = true;
-					break;
-				}
-				prev = curr;
-				curr = curr->_next;
-			}
-			return ret;
+			std::pair<nodeptr, nodeptr> find = this->_find_node_and_prev(node);
+			return this->_remove_node(find.first, find.second);
 		}
 		bool remove(const T &value)
-		{
-			bool ret = false;
-			nodeptr curr = _head, prev = nullptr;
-			while (curr)
-			{
-				if (curr->_value == value)
-				{
-#if DEBUG
-					curr->_in_list = false;
-#endif
-					nodeptr next = curr->_next;
-					curr = nullptr;
-					if (prev)
-						prev->_next = next;
-					else
-						_head = next;
-					ret = true;
-					break;
-				}
-				prev = curr;
-				curr = curr->_next;
-			}
-			return ret;
+		{	// remove the first node which value equals the argument
+			std::pair<nodeptr, nodeptr> find = this->_find_node_and_prev(value);
+			return this->_remove_node(find.first, find.second);
 		}
 		size_t remove_all(const T &value)
 		{
@@ -369,13 +360,14 @@ namespace lyf
 					curr->_in_list = false;
 #endif
 					nodeptr next = curr->_next;
-					curr = nullptr;
 					if (prev)
 						prev->_next = next;
 					else
 						_head = next;
-					count++;
+					curr->_next = nullptr;
 					curr = next;
+					count++;
+					_size--;
 				}
 				else
 				{
@@ -386,7 +378,6 @@ namespace lyf
 			return count;
 		}
 		
-
 	protected:
 		size_t _size = 0;
 		nodeptr _head = nullptr;
@@ -400,6 +391,53 @@ namespace lyf
 			_head = node;
 #endif
 			_size++;
+		}
+
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(const nodeptr &tofind)
+		{
+			nodeptr node = _head, prev = nullptr;
+			while (node)
+			{
+				if (node == tofind)
+					break;
+				prev = node;
+				node = node->_next;
+			}
+			return std::pair<nodeptr, nodeptr>(node, prev);
+		}
+
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(const T &tofind)
+		{
+			nodeptr node = _head, prev = nullptr;
+			while (node)
+			{
+				if (node->_value == tofind)
+					break;
+				prev = node;
+				node = node->_next;
+			}
+			return std::pair<nodeptr, nodeptr>(node, prev);
+		}
+
+		void _destroy()
+		{
+#if DEBUG
+			nodeptr np = _head;
+			_head.reset();
+			while (np)
+			{
+				if (np.use_count() > 1)
+					np->_in_list = false;
+				np = np->_next;
+			}
+#else
+			while (_head)
+			{
+				nodeptr next = _head->_next;
+				delete _head;
+				_head = next;
+			}
+#endif
 		}
 	};
 
