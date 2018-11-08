@@ -121,10 +121,21 @@ namespace lyf
 	template<typename Node>
 	class _CheckedLinkedList;
 
+	template<typename Valt, typename Node>
+	class _BaseLinkedList;
+
+	template<typename Valt, typename BaseNode>
+	class ForwardLinkedList;
+
+	template<typename Valt, typename BaseNode>
+	class LinkedList;
+
 	template<typename Valt, typename Base>
 	class ForwardLinkedListNode : public Base
 	{
 		friend class _CheckedLinkedList<ForwardLinkedListNode>;
+		friend class _BaseLinkedList<Valt, ForwardLinkedListNode>;
+		friend class ForwardLinkedList<Valt, Base>;
 	public:
 		using nodeptr = typename _CheckedLinkedList<ForwardLinkedListNode>::nodeptr;
 
@@ -143,6 +154,8 @@ namespace lyf
 	class LinkedListNode : public Base
 	{
 		friend class _CheckedLinkedList<LinkedListNode>;
+		friend class _BaseLinkedList<Valt, LinkedListNode>;
+		friend class LinkedList<Valt, Base>;
 	public:
 		using nodeptr = typename _CheckedLinkedList<LinkedListNode>::nodeptr;
 		
@@ -243,6 +256,8 @@ namespace lyf
 
 		void _ensureInList(const nodeptr &node) const
 		{
+			if (!node)
+				return;
 			node->_ensureInCont(this);
 		}
 
@@ -434,7 +449,7 @@ namespace lyf
 		void _add_node_front(Node *node)
 		{
 			node->_next = _head;
-			_head = node;
+			this->_assign_node(_head, node);
 			_size++;
 		}
 
@@ -505,31 +520,7 @@ namespace lyf
 	template<typename Valt>
 	using SharedForwardLinkedList = ForwardLinkedList<Valt, SharedNode<Valt>>;
 
-
-
-
-
-
-
-
-
-
-
-
 	
-
-//	template<typename T>
-//	class LinkedList :public ForwardLinkedList<T>
-//	{
-//	public:
-//		using Node = LinkedListNode<T>;
-//#if DEBUG
-//		using nodeptr = std::shared_ptr<Node>;
-//#else
-//		using nodeptr = Node * ;
-//#endif
-//
-//	};
 
 }
 

@@ -587,7 +587,7 @@ namespace lyf
 				throw std::runtime_error("The node is outside range!");
 #endif
 		}
-		void _ensureInCont(void *pCont) const
+		void _ensureInCont(const void *pCont) const
 		{
 #if DEBUG
 			if (_pCont != pCont)
