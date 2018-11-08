@@ -148,6 +148,13 @@ namespace lyf
 	private:
 		using Base::Base;
 		nodeptr _next = nullptr;
+
+		ForwardLinkedListNode() {}
+
+		ForwardLinkedListNode(const ForwardLinkedListNode &rhs)
+			: Base(rhs), _next()
+		{
+		}
 	};
 
 	template<typename Valt, typename Base>
@@ -174,6 +181,13 @@ namespace lyf
 		using Base::Base;
 		nodeptr _prev = nullptr;
 		nodeptr _next = nullptr;
+
+		LinkedListNode() {}
+
+		LinkedListNode(const LinkedListNode &rhs)
+			: Base(rhs), _prev(), _next()
+		{
+		}
 	};
 
 	template<typename Node>
@@ -275,14 +289,12 @@ namespace lyf
 
 		void _destroy()
 		{
-			nodeptr np = _head;
-			_head = nullptr;
-			while (np)
+			while (_head)
 			{
-				nodeptr next = np->_next;
-				this->_set_out(np);
-				this->_delete_node(np);
-				np = next;
+				nodeptr next = _head->_next;
+				this->_set_out(_head);
+				this->_delete_node(_head);
+				_head = next;
 			}
 		}
 	};
@@ -301,12 +313,13 @@ namespace lyf
 		ForwardLinkedList() {}
 
 		ForwardLinkedList(const ForwardLinkedList &rhs)
-			: _size(rhs._size), _head(ForwardLinkedList::_copy(rhs))
 		{
+			ForwardLinkedList::_copy_sublist(*this, rhs, rhs.head_node());
+			_size = rhs._size;
 		}
 
 		ForwardLinkedList(ForwardLinkedList &&rhs)
-			: _size(rhs._size), _head(rhs._head)
+			: _MyBase(std::move(rhs))
 		{
 			rhs._size = 0;
 			rhs._head = nullptr;
@@ -316,9 +329,8 @@ namespace lyf
 		{
 			if (this != &rhs)
 			{
-				_destroy();
+				_copy_sublist(*this, rhs, rhs.head_node());
 				_size = rhs._size;
-				_head = this->_copy(rhs);
 			}
 			return *this;
 		}
@@ -350,6 +362,13 @@ namespace lyf
 				mid = right;
 			}
 			_head = left;
+		}
+
+		ForwardLinkedList sublist(nodeptr begin, nodeptr end = nullptr)
+		{
+			ForwardLinkedList ret;
+			this->_copy_sublist(ret, *this, begin, end);
+			return ret;
 		}
 
 		void push(const Valt &value)
@@ -428,22 +447,27 @@ namespace lyf
 		}
 
 	private:
-		static nodeptr _copy(const ForwardLinkedList &rhs)
+		static void _copy_sublist(ForwardLinkedList &dst, const ForwardLinkedList &src, nodeptr begin, nodeptr end = nullptr)
 		{
-			nodeptr new_head = nullptr, curr;
-			nodeptr nd = rhs.head_node();
-			if (nd)
+			dst.clear();
+			nodeptr curr;
+			nodeptr nd = src.head_node();
+			while (nd && nd != begin)
+				nd = nd->_next;
+			if (nd && nd != end)
 			{
-				curr = check_t::new_node(new Node(this, *(nd->_pVal)));
+				curr = check_t::_new_node(new Node(*nd));
+				dst._head = curr;
+				curr->_setCont(&dst);
 				nd = nd->_next;
 			}
-			while (nd)
+			while (nd && nd != end)
 			{
-				curr->_next = check_t::new_node(new Node(this, *(nd->_pVal)));
+				curr->_next = check_t::_new_node(new Node(*nd));
 				curr = curr->_next;
+				curr->_setCont(&dst);
 				nd = nd->_next;
 			}
-			return new_head;
 		}
 
 		void _add_node_front(Node *node)
