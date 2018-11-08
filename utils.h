@@ -432,12 +432,12 @@ namespace lyf
 		explicit TestClass(const string &name)
 			:name(new string(name))
 		{
-			cout << "construct " << name << endl;
+			//cout << "construct " << name << endl;
 		}
 		~TestClass()
 		{
-			if (name)
-				cout << "destroy " << *name << endl;
+			//if (name)
+			//	cout << "destroy " << *name << endl;
 			delete name;
 		}
 		TestClass(const TestClass &rhs)
@@ -552,7 +552,139 @@ namespace lyf
 	};
 
 
+	class _CheckedNode
+	{
+	public:
+		virtual ~_CheckedNode() {}
 
+	protected:
+		_CheckedNode() {}
+
+		_CheckedNode(void *pCont)
+#if DEBUG
+			:_pCont(pCont)
+#endif
+		{
+		}
+
+		_CheckedNode(const _CheckedNode &rhs)
+#if DEBUG
+			:_pCont(rhs._pCont)
+#endif
+		{
+		}
+
+		void _setCont(void *pCont = nullptr)
+		{
+#if DEBUG
+			_pCont = pCont;
+#endif
+		}
+		void _ensureInCont() const
+		{
+#if DEBUG
+			if (!_pCont)
+				throw std::runtime_error("The node is outside range!");
+#endif
+		}
+		void _ensureInCont(void *pCont) const
+		{
+#if DEBUG
+			if (_pCont != pCont)
+				throw std::runtime_error("The node is outside range!");
+#endif
+		}
+
+	private:
+#if DEBUG
+		void *_pCont = nullptr;
+#endif
+
+	};
+
+
+	template<typename Valt>
+	class SharedNode : public _CheckedNode
+	{
+	private:
+		using _MyBase = _CheckedNode;
+	public:
+
+		Valt &value()
+		{
+			_ensureInCont();
+			return *_pVal;
+		}
+
+	protected:
+		SharedNode() {}
+
+		SharedNode(const SharedNode &rhs)
+			:_MyBase(), _pVal(rhs._pVal)
+		{
+		}
+
+		SharedNode(void *pCont, const Valt &value)
+			:_MyBase(pCont), _pVal(new Valt(value))
+		{
+		}
+
+		SharedNode(void *pCont, Valt &&value)
+			:_MyBase(pCont), _pVal(new Valt(std::move(value)))
+		{
+		}
+
+		template<typename... Types>
+		SharedNode(void *pCont, Types&&... args)
+			:_MyBase(pCont), _pVal(new Valt(std::forward<Types>(args)...))
+		{
+		}
+
+		std::shared_ptr<Valt> _pVal = nullptr;
+
+	};
+
+	template<typename Valt>
+	class UniqueNode : public _CheckedNode
+	{
+	private:
+		using _MyBase = _CheckedNode;
+	public:
+		UniqueNode & operator=(const UniqueNode &) = delete;
+
+		Valt &value()
+		{
+			_ensureInCont();
+			return *_pVal;
+		}
+
+	protected:
+		UniqueNode() {}
+
+		UniqueNode(const UniqueNode &rhs)
+			:_MyBase(), _pVal(new Valt(*(rhs._pVal)))
+		{
+		}
+
+		UniqueNode(void *pCont, const Valt &value)
+			:_MyBase(pCont), _pVal(new Valt(value))
+		{
+		}
+
+		UniqueNode(void *pCont, Valt &&value)
+			:_MyBase(pCont), _pVal(new Valt(std::move(value)))
+		{
+		}
+
+		template<typename... Types>
+		UniqueNode(void *pCont, Types&&... args)
+			: _MyBase(pCont), _pVal(new Valt(std::forward<Types>(args)...))
+		{
+		}
+
+		std::unique_ptr<Valt> _pVal = nullptr;
+
+	};
 	
 	
 }

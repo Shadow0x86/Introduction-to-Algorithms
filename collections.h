@@ -12,7 +12,10 @@ namespace lyf
 	public:
 		virtual ~_AbsColl() {}
 
-		virtual size_t size() const = 0;
+		virtual size_t size() const
+		{
+			return _size;
+		}
 		bool empty()
 		{
 			return size() == 0;
@@ -22,6 +25,9 @@ namespace lyf
 		virtual void push(const T &value) = 0;
 		virtual void push(T &&value) = 0;
 		virtual T pop() = 0;
+
+	protected:
+		size_t _size = 0;
 	};
 
 	template<typename T, typename Container>
@@ -111,113 +117,184 @@ namespace lyf
 		}
 	};
 
-	template<typename T>
-	class ForwardLinkedList;
 
-	template<typename T>
-	class ForwardLinkedListNode
+	template<typename Node>
+	class _CheckedLinkedList;
+
+	template<typename Valt, typename Base>
+	class ForwardLinkedListNode : public Base
 	{
-		friend class ForwardLinkedList<T>;
+		friend class _CheckedLinkedList<ForwardLinkedListNode>;
 	public:
-#if DEBUG
-		using nodeptr = std::shared_ptr<ForwardLinkedListNode>;
-#else
-		using nodeptr = ForwardLinkedListNode * ;
-#endif
-		virtual ~ForwardLinkedListNode() {}
+		using nodeptr = typename _CheckedLinkedList<ForwardLinkedListNode>::nodeptr;
 
 		nodeptr next() const
 		{
-			_ensureValid();
+			this->_ensureInCont();
 			return _next;
-		}
-		T &value()
-		{
-			_ensureValid();
-			return _value;
-		}
-
-	protected:
-		ForwardLinkedListNode(const T &value)
-			: _value(value)
-		{
-		}
-		ForwardLinkedListNode(T &&value)
-			: _value(std::move(value))
-		{
-		}
-
-		template<typename... Types>
-		ForwardLinkedListNode(Types&&... args)
-			: _value(std::forward<Types>(args)...)
-		{
-		}
-
-		T _value;
-		nodeptr _next = nullptr;
-#if DEBUG
-		bool _in_list = true;
-#endif
-		void _ensureValid() const
-		{
-#if DEBUG
-			if (!_in_list)
-				throw std::runtime_error("The node is not in list!");
-#endif
-		}
-	};
-
-	template<typename T>
-	class LinkedList;
-
-	template<typename T>
-	class LinkedListNode : public ForwardLinkedListNode<T>
-	{
-		friend class LinkedList<T>;
-	public:
-#if DEBUG
-		using nodeptr = std::shared_ptr<LinkedListNode>;
-#else
-		using nodeptr = LinkedListNode * ;
-#endif
-		
-		nodeptr prev() const
-		{
-			this->_ensureValid();
-			return _prev;
 		}
 
 	private:
-		nodeptr _prev = nullptr;
+		using Base::Base;
+		nodeptr _next = nullptr;
 	};
 
+	template<typename Valt, typename Base>
+	class LinkedListNode : public Base
+	{
+		friend class _CheckedLinkedList<LinkedListNode>;
+	public:
+		using nodeptr = typename _CheckedLinkedList<LinkedListNode>::nodeptr;
+		
+		nodeptr prev() const
+		{
+			this->_ensureInCont();
+			return _prev;
+		}
+		nodeptr next() const
+		{
+			this->_ensureInCont();
+			return _next;
+		}
 
-	template<typename T>
-	class ForwardLinkedList : public _AbsColl<T>
+	private:
+		using Base::Base;
+		nodeptr _prev = nullptr;
+		nodeptr _next = nullptr;
+	};
+
+	template<typename Node>
+	class _CheckedLinkedList
 	{
 	public:
-		using Node = ForwardLinkedListNode<T>;
 #if DEBUG
 		using nodeptr = std::shared_ptr<Node>;
 #else
 		using nodeptr = Node * ;
 #endif
 
+	protected:
+		static nodeptr _new_node(Node *pNode)
+		{
+#if DEBUG
+			return nodeptr(pNode);
+#else
+			return pNode;
+#endif
+		}
+
+		static void _assign_node(nodeptr &ln, Node *pNode)
+		{
+#if DEBUG
+			ln.reset(pNode);
+#else
+			ln = pNode;
+#endif
+		}
+
+		static void _delete_node(nodeptr &node)
+		{
+#if DEBUG
+			node.reset();
+#else
+			delete node;
+#endif
+		}
+
+		static void _set_out(nodeptr &node)
+		{
+			node->_setCont();
+		}
+	};
+
+	template<typename Valt, typename Node>
+	class _BaseLinkedList : public _AbsColl<Valt>, public _CheckedLinkedList<Node>
+	{
+	public:
+		using check_t = _CheckedLinkedList<Node>;
+		using nodeptr = typename check_t::nodeptr;
+
+		~_BaseLinkedList()
+		{
+			_destroy();
+		}
+
+		void clear()
+		{
+			_destroy();
+			_size = 0;
+		}
+		Valt head() const
+		{
+			return *(_head->_pVal);
+		}
+		nodeptr head_node() const
+		{
+			return _head;
+		}
+
+		nodeptr search(const Valt &value) const
+		{
+			return this->_find_node_by_value(value);
+		}
+
+	protected:
+		nodeptr _head = nullptr;
+
+		void _ensureInList(const nodeptr &node) const
+		{
+			node->_ensureInCont(this);
+		}
+
+		nodeptr _find_node_by_value(const Valt &tofind) const
+		{
+			nodeptr node = _head;
+			while (node)
+			{
+				if (*(node->_pVal) == tofind)
+					break;
+				node = node->_next;
+			}
+			return node;
+		}
+
+		void _destroy()
+		{
+			nodeptr np = _head;
+			_head = nullptr;
+			while (np)
+			{
+				nodeptr next = np->_next;
+				this->_set_out(np);
+				this->_delete_node(np);
+				np = next;
+			}
+		}
+	};
+
+
+	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
+	class ForwardLinkedList : public _BaseLinkedList<Valt, ForwardLinkedListNode<Valt, BaseNode>>
+	{
+	public:
+		using Node = ForwardLinkedListNode<Valt, BaseNode>;
+		using _MyBase = _BaseLinkedList<Valt, ForwardLinkedListNode<Valt, BaseNode>>;
+		using check_t = typename _MyBase::check_t;
+		using nodeptr = typename _MyBase::nodeptr;
+
 	public:
 		ForwardLinkedList() {}
+
 		ForwardLinkedList(const ForwardLinkedList &rhs)
 			: _size(rhs._size), _head(ForwardLinkedList::_copy(rhs))
 		{
 		}
+
 		ForwardLinkedList(ForwardLinkedList &&rhs)
 			: _size(rhs._size), _head(rhs._head)
 		{
 			rhs._size = 0;
 			rhs._head = nullptr;
-		}
-		virtual ~ForwardLinkedList()
-		{
-			_destroy();
 		}
 
 		ForwardLinkedList &operator=(const ForwardLinkedList &rhs)
@@ -226,10 +303,11 @@ namespace lyf
 			{
 				_destroy();
 				_size = rhs._size;
-				_head = ForwardLinkedList::_copy(rhs);
+				_head = this->_copy(rhs);
 			}
 			return *this;
 		}
+
 		ForwardLinkedList &operator=(ForwardLinkedList &&rhs)
 		{
 			if (this != &rhs)
@@ -243,11 +321,7 @@ namespace lyf
 			return *this;
 		}
 
-		size_t size() const
-		{
-			return _size;
-		}
-		virtual void reverse()
+		void reverse()
 		{
 			if (_size <= 1)
 				return;
@@ -262,130 +336,63 @@ namespace lyf
 			}
 			_head = left;
 		}
-		void clear()
-		{
-			_destroy();
-			_size = 0;
-		}
-		T head() const
-		{
-			return _head->_value;
-		}
-		nodeptr head_node() const
-		{
-			return _head;
-		}
 
-		void push(const T &value)
+		void push(const Valt &value)
 		{	// push the value to list head
-			_add_node_front(new Node(value));
+			_add_node_front(new Node(this, value));
 		}
-		void push(T &&value)
+		void push(Valt &&value)
 		{	// push the value to list head
-			_add_node_front(new Node(std::move(value)));
+			_add_node_front(new Node(this, std::move(value)));
 		}
 
 		template<typename... Types>
 		void emplace_front(Types&&... args)
 		{	// construct node at list head
-			_add_node_front(new Node(std::forward<Types>(args)...));
+			_add_node_front(new Node(this, std::forward<Types>(args)...));
 		}
 
-		T pop()
+		Valt pop()
 		{	// pop the value at list head
-			T ret = _head->_value;
+			Valt ret = *(_head->_pVal);
 			nodeptr oh = _head;
 			_head = _head->_next;
-#if DEBUG
-			oh.reset();
-#else
-			delete oh;
-#endif
+			this->_delete_node(oh);
 			_size--;
 			return ret;
 		}
 
-		nodeptr search(const T &value) const
-		{
-			auto find = this->_find_node_and_prev(value);
-			return find.first;
-		}
-		bool insert(nodeptr node, const T &value)
+		bool insert(nodeptr node, const Valt &value)
 		{	// insert a value before the node
-#if DEBUG
-			nodeptr new_node(new Node(value));
-#else
-			nodeptr new_node = new Node(value);
-#endif
-			return _insert_node(node, new_node);
+			return _insert_node(node, this->_new_node(new Node(this, value)));
 		}
-		
+
 		template<typename... Types>
 		bool emplace(nodeptr node, Types... args)
 		{	// construct a value before the node
-#if DEBUG
-			nodeptr new_node(new Node(std::forward<Types>(args)...));
-#else
-			nodeptr new_node = new Node(std::forward<Types>(args)...);
-#endif
-			return _insert_node(node, new_node);
+			return _insert_node(node, this->_new_node(new Node(this, std::forward<Types>(args)...)));
 		}
 
-		bool _insert_node(nodeptr tofind, nodeptr toinsert)
-		{
-			bool ret = false;
-			std::pair<nodeptr, nodeptr> find = this->_find_node_and_prev(tofind);
-			if (find.first || !tofind)
-			{
-				ret = true;
-				toinsert->_next = find.first;
-				if (find.second)
-					find.second->_next = toinsert;
-				else
-					_head = toinsert;
-				_size++;
-			}
-			return ret;
-		}
-		bool _remove_node(nodeptr toremove, nodeptr prev)
-		{
-			bool ret = false;
-			if (toremove)
-			{
-				if (prev)
-					prev->_next = toremove->_next;
-				else
-					_head = toremove->_next;
-#if DEBUG
-				toremove->_in_list = false;
-#endif
-				toremove->_next = nullptr;
-				_size--;
-				ret = true;
-			}
-			return ret;
-		}
 		bool remove(nodeptr node)
 		{
-			std::pair<nodeptr, nodeptr> find = this->_find_node_and_prev(node);
-			return this->_remove_node(find.first, find.second);
+			this->_ensureInList(node);
+			std::pair<nodeptr, nodeptr> found = this->_find_node_and_prev(node);
+			return this->_remove_node(found.first, found.second);
 		}
-		bool remove(const T &value)
+		bool remove(const Valt &value)
 		{	// remove the first node which value equals the argument
-			std::pair<nodeptr, nodeptr> find = this->_find_node_and_prev(value);
-			return this->_remove_node(find.first, find.second);
+			std::pair<nodeptr, nodeptr> found = this->_find_node_and_prev(value);
+			return this->_remove_node(found.first, found.second);
 		}
-		size_t remove_all(const T &value)
+		size_t remove_all(const Valt &value)
 		{
 			size_t count = 0;
 			nodeptr curr = _head, prev = nullptr;
 			while (curr)
 			{
-				if (curr->_value == value)
+				if (*(curr->_pVal) == value)
 				{
-#if DEBUG
-					curr->_in_list = false;
-#endif
+					this->_set_out(curr);
 					nodeptr next = curr->_next;
 					if (prev)
 						prev->_next = next;
@@ -404,47 +411,65 @@ namespace lyf
 			}
 			return count;
 		}
-		
-	protected:
-		size_t _size = 0;
-		nodeptr _head = nullptr;
 
-		void _add_node_front(Node *node)
-		{
-			node->_next = _head;
-#if DEBUG
-			_head.reset(node);
-#else
-			_head = node;
-#endif
-			_size++;
-		}
-
+	private:
 		static nodeptr _copy(const ForwardLinkedList &rhs)
 		{
-			nodeptr new_head, curr;
+			nodeptr new_head = nullptr, curr;
 			nodeptr nd = rhs.head_node();
 			if (nd)
 			{
-#if DEBUG
-				new_head.reset(new Node(nd->_value));
-#else
-				new_head = new Node(nd->_value);
-#endif
-				curr = new_head;
+				curr = check_t::new_node(new Node(this, *(nd->_pVal)));
 				nd = nd->_next;
 			}
 			while (nd)
 			{
-#if DEBUG
-				curr->_next.reset(new Node(nd->_value));
-#else
-				curr->_next = new Node(nd->_value);
-#endif
+				curr->_next = check_t::new_node(new Node(this, *(nd->_pVal)));
 				curr = curr->_next;
 				nd = nd->_next;
 			}
 			return new_head;
+		}
+
+		void _add_node_front(Node *node)
+		{
+			node->_next = _head;
+			_head = node;
+			_size++;
+		}
+
+		bool _insert_node(const nodeptr &tofind, nodeptr &toinsert)
+		{
+			bool ret = false;
+			std::pair<nodeptr, nodeptr> found = this->_find_node_and_prev(tofind);
+			if (found.first || !tofind)
+			{
+				ret = true;
+				toinsert->_next = found.first;
+				if (found.second)
+					found.second->_next = toinsert;
+				else
+					_head = toinsert;
+				_size++;
+			}
+			return ret;
+		}
+
+		bool _remove_node(nodeptr &toremove, nodeptr &prev)
+		{
+			bool ret = false;
+			if (toremove)
+			{
+				if (prev)
+					prev->_next = toremove->_next;
+				else
+					_head = toremove->_next;
+				this->_set_out(toremove);
+				toremove->_next = nullptr;
+				_size--;
+				ret = true;
+			}
+			return ret;
 		}
 
 		std::pair<nodeptr, nodeptr> _find_node_and_prev(const nodeptr &tofind) const
@@ -460,12 +485,12 @@ namespace lyf
 			return std::pair<nodeptr, nodeptr>(node, prev);
 		}
 
-		std::pair<nodeptr, nodeptr> _find_node_and_prev(const T &tofind) const
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(const Valt &tofind) const
 		{
 			nodeptr node = _head, prev = nullptr;
 			while (node)
 			{
-				if (node->_value == tofind)
+				if (*(node->_pVal) == tofind)
 					break;
 				prev = node;
 				node = node->_next;
@@ -473,40 +498,38 @@ namespace lyf
 			return std::pair<nodeptr, nodeptr>(node, prev);
 		}
 
-		void _destroy()
-		{
-#if DEBUG
-			nodeptr np = _head;
-			_head.reset();
-			while (np)
-			{
-				if (np.use_count() > 1)
-					np->_in_list = false;
-				np = np->_next;
-			}
-#else
-			while (_head)
-			{
-				nodeptr next = _head->_next;
-				delete _head;
-				_head = next;
-			}
-#endif
-		}
 	};
 
-	template<typename T>
-	class LinkedList :public ForwardLinkedList<T>
-	{
-	public:
-		using Node = LinkedListNode<T>;
-#if DEBUG
-		using nodeptr = std::shared_ptr<Node>;
-#else
-		using nodeptr = Node * ;
-#endif
+	template<typename Valt>
+	using UniqueForwardLinkedList = ForwardLinkedList<Valt, UniqueNode<Valt>>;
+	template<typename Valt>
+	using SharedForwardLinkedList = ForwardLinkedList<Valt, SharedNode<Valt>>;
 
-	};
+
+
+
+
+
+
+
+
+
+
+
+	
+
+//	template<typename T>
+//	class LinkedList :public ForwardLinkedList<T>
+//	{
+//	public:
+//		using Node = LinkedListNode<T>;
+//#if DEBUG
+//		using nodeptr = std::shared_ptr<Node>;
+//#else
+//		using nodeptr = Node * ;
+//#endif
+//
+//	};
 
 }
 
