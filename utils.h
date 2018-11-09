@@ -569,9 +569,14 @@ namespace lyf
 
 		_CheckedNode(const _CheckedNode &rhs)
 #if DEBUG
-			:_pCont(rhs._pCont)
+			:_pCont()
 #endif
 		{
+		}
+
+		_CheckedNode &operator=(const _CheckedNode &rhs)
+		{
+			return *this;
 		}
 
 		void _setCont(void *pCont = nullptr)
@@ -606,9 +611,8 @@ namespace lyf
 	template<typename Valt>
 	class SharedNode : public _CheckedNode
 	{
-	private:
-		using _MyBase = _CheckedNode;
 	public:
+		using _MyBase = _CheckedNode;
 
 		Valt &value()
 		{
@@ -620,8 +624,18 @@ namespace lyf
 		SharedNode() {}
 
 		SharedNode(const SharedNode &rhs)
-			:_MyBase(), _pVal(rhs._pVal)
+			:_MyBase(rhs), _pVal(rhs._pVal)
 		{
+		}
+
+		SharedNode &operator=(const SharedNode &rhs)
+		{
+			if (this != &rhs)
+			{
+				_MyBase::operator=(rhs);
+				_pVal = rhs._pVal;
+			}
+			return *this;
 		}
 
 		SharedNode(void *pCont, const Valt &value)
@@ -647,10 +661,8 @@ namespace lyf
 	template<typename Valt>
 	class UniqueNode : public _CheckedNode
 	{
-	private:
-		using _MyBase = _CheckedNode;
 	public:
-		UniqueNode & operator=(const UniqueNode &) = delete;
+		using _MyBase = _CheckedNode;
 
 		Valt &value()
 		{
@@ -662,8 +674,18 @@ namespace lyf
 		UniqueNode() {}
 
 		UniqueNode(const UniqueNode &rhs)
-			:_MyBase(), _pVal(new Valt(*(rhs._pVal)))
+			:_MyBase(rhs), _pVal(new Valt(*(rhs._pVal)))
 		{
+		}
+
+		UniqueNode &operator=(const UniqueNode &rhs)
+		{
+			if (this != &rhs)
+			{
+				_MyBase::operator=(rhs);
+				_pVal.reset(new Valt(*(rhs._pVal)));
+			}
+			return *this;
 		}
 
 		UniqueNode(void *pCont, const Valt &value)

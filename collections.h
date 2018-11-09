@@ -137,7 +137,18 @@ namespace lyf
 		friend class _BaseLinkedList<Valt, ForwardLinkedListNode>;
 		friend class ForwardLinkedList<Valt, Base>;
 	public:
+		using _MyBase = Base;
 		using nodeptr = typename _CheckedLinkedList<ForwardLinkedListNode>::nodeptr;
+
+		ForwardLinkedListNode &operator=(const ForwardLinkedListNode &rhs)
+		{	// not change next
+			this->_ensureInCont();
+			if (this != &rhs)
+			{
+				_MyBase::operator=(rhs);
+			}
+			return *this;
+		}
 
 		nodeptr next() const
 		{
@@ -152,9 +163,10 @@ namespace lyf
 		ForwardLinkedListNode() {}
 
 		ForwardLinkedListNode(const ForwardLinkedListNode &rhs)
-			: Base(rhs), _next()
+			: _MyBase(rhs), _next()
 		{
 		}
+
 	};
 
 	template<typename Valt, typename Base>
@@ -164,7 +176,18 @@ namespace lyf
 		friend class _BaseLinkedList<Valt, LinkedListNode>;
 		friend class LinkedList<Valt, Base>;
 	public:
+		using _MyBase = Base;
 		using nodeptr = typename _CheckedLinkedList<LinkedListNode>::nodeptr;
+
+		LinkedListNode &operator=(const LinkedListNode &rhs)
+		{	// not change prev and next
+			this->_ensureInCont();
+			if (this != &rhs)
+			{
+				_MyBase::operator=(rhs);
+			}
+			return *this;
+		}
 		
 		nodeptr prev() const
 		{
@@ -188,6 +211,7 @@ namespace lyf
 			: Base(rhs), _prev(), _next()
 		{
 		}
+
 	};
 
 	template<typename Node>
@@ -253,7 +277,7 @@ namespace lyf
 		}
 		Valt head() const
 		{
-			return *(_head->_pVal);
+			return _head->value();
 		}
 		nodeptr head_node() const
 		{
@@ -280,7 +304,7 @@ namespace lyf
 			nodeptr node = _head;
 			while (node)
 			{
-				if (*(node->_pVal) == tofind)
+				if (node->value() == tofind)
 					break;
 				node = node->_next;
 			}
@@ -304,8 +328,9 @@ namespace lyf
 	class ForwardLinkedList : public _BaseLinkedList<Valt, ForwardLinkedListNode<Valt, BaseNode>>
 	{
 	public:
-		using Node = ForwardLinkedListNode<Valt, BaseNode>;
-		using _MyBase = _BaseLinkedList<Valt, ForwardLinkedListNode<Valt, BaseNode>>;
+		using value_type = Valt;
+		using Node = ForwardLinkedListNode<value_type, BaseNode>;
+		using _MyBase = _BaseLinkedList<value_type, ForwardLinkedListNode<value_type, BaseNode>>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename _MyBase::nodeptr;
 
@@ -348,6 +373,21 @@ namespace lyf
 			return *this;
 		}
 
+		value_type &operator[](size_t index)
+		{
+#if DEBUG
+			if (index >= _size)
+				throw std::runtime_error("index out of range");
+#endif
+			nodeptr nd = _head;
+			while (index)
+			{
+				nd = nd->_next;
+				index--;
+			}
+			return nd->value();
+		}
+
 		void reverse()
 		{
 			if (_size <= 1)
@@ -364,18 +404,19 @@ namespace lyf
 			_head = left;
 		}
 
-		ForwardLinkedList sublist(nodeptr begin, nodeptr end = nullptr)
+		ForwardLinkedList sublist(nodeptr begin, nodeptr end = nullptr) const
 		{
 			ForwardLinkedList ret;
 			this->_copy_sublist(ret, *this, begin, end);
 			return ret;
 		}
 
-		void push(const Valt &value)
+		void push(const value_type &value)
 		{	// push the value to list head
 			_add_node_front(new Node(this, value));
 		}
-		void push(Valt &&value)
+
+		void push(value_type &&value)
 		{	// push the value to list head
 			_add_node_front(new Node(this, std::move(value)));
 		}
@@ -386,9 +427,9 @@ namespace lyf
 			_add_node_front(new Node(this, std::forward<Types>(args)...));
 		}
 
-		Valt pop()
+		value_type pop()
 		{	// pop the value at list head
-			Valt ret = *(_head->_pVal);
+			value_type ret = _head->value();
 			nodeptr oh = _head;
 			_head = _head->_next;
 			this->_delete_node(oh);
@@ -396,7 +437,7 @@ namespace lyf
 			return ret;
 		}
 
-		bool insert(nodeptr node, const Valt &value)
+		bool insert(nodeptr node, const value_type &value)
 		{	// insert a value before the node
 			return _insert_node(node, this->_new_node(new Node(this, value)));
 		}
@@ -413,18 +454,20 @@ namespace lyf
 			std::pair<nodeptr, nodeptr> found = this->_find_node_and_prev(node);
 			return this->_remove_node(found.first, found.second);
 		}
-		bool remove(const Valt &value)
+
+		bool remove(const value_type &value)
 		{	// remove the first node which value equals the argument
 			std::pair<nodeptr, nodeptr> found = this->_find_node_and_prev(value);
 			return this->_remove_node(found.first, found.second);
 		}
-		size_t remove_all(const Valt &value)
+
+		size_t remove_all(const value_type &value)
 		{
 			size_t count = 0;
 			nodeptr curr = _head, prev = nullptr;
 			while (curr)
 			{
-				if (*(curr->_pVal) == value)
+				if (curr->value() == value)
 				{
 					this->_set_out(curr);
 					nodeptr next = curr->_next;
@@ -524,12 +567,12 @@ namespace lyf
 			return std::pair<nodeptr, nodeptr>(node, prev);
 		}
 
-		std::pair<nodeptr, nodeptr> _find_node_and_prev(const Valt &tofind) const
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(const value_type &tofind) const
 		{
 			nodeptr node = _head, prev = nullptr;
 			while (node)
 			{
-				if (*(node->_pVal) == tofind)
+				if (node->value() == tofind)
 					break;
 				prev = node;
 				node = node->_next;
