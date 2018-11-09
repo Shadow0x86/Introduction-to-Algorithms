@@ -703,18 +703,17 @@ namespace lyf
 			if (_size <= 1)
 				return;
 			nodeptr left = _head, right = _head->_next;
-			_head->_next = nullptr;
-			_tail->_prev = nullptr;
 			_head = _tail;
 			_tail = left;
 			while (right)
 			{
+				left->_next = left->_prev;
 				left->_prev = right;
-				right->_next = left;
 				left = right;
-				right = left->_next;
+				right = right->_next;
 			}
-			_head->_next = left;
+			left->_next = left->_prev;
+			left->_prev = right;
 		}
 
 		LinkedList sublist(nodeptr begin, nodeptr end = nullptr) const
