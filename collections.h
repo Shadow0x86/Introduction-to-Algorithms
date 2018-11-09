@@ -285,7 +285,7 @@ namespace lyf
 
 		void clear()
 		{
-			_destroy();
+			this->_destroy();
 			_size = 0;
 		}
 
@@ -339,7 +339,15 @@ namespace lyf
 			return node;
 		}
 
-		virtual void _destroy() = 0;
+		void _destroy()
+		{
+			while (_head)
+			{
+				nodeptr next = _head->_next;
+				this->_delete_node(_head);
+				_head = next;
+			}
+		}
 
 	};
 
@@ -383,7 +391,7 @@ namespace lyf
 		{
 			if (this != &rhs)
 			{
-				_destroy();
+				this->_destroy();
 				_head = rhs._head;
 				_size = rhs._size;
 				rhs._head = nullptr;
@@ -501,16 +509,6 @@ namespace lyf
 		}
 
 	private:
-		void _destroy() override
-		{
-			while (_head)
-			{
-				nodeptr next = _head->_next;
-				this->_delete_node(_head);
-				_head = next;
-			}
-		}
-
 		static void _copy_sublist(ForwardLinkedList &dst, const ForwardLinkedList &src, nodeptr begin, nodeptr end = nullptr)
 		{
 			dst.clear();
@@ -641,6 +639,11 @@ namespace lyf
 			rhs._tail = nullptr;
 		}
 
+		~LinkedList()
+		{
+			this->_destroy();
+		}
+
 		LinkedList &operator=(const LinkedList &rhs)
 		{
 			if (this != &rhs)
@@ -654,7 +657,7 @@ namespace lyf
 		{
 			if (this != &rhs)
 			{
-				_destroy();
+				this->_destroy();
 				_head = rhs._head;
 				_tail = rhs._tail;
 				_size = rhs._size;
@@ -663,6 +666,12 @@ namespace lyf
 				rhs._size = 0;
 			}
 			return *this;
+		}
+
+		void clear()
+		{
+			this->_destroy();
+			_size = 0;
 		}
 
 		void swap(nodeptr ln, nodeptr rn)
@@ -845,14 +854,9 @@ namespace lyf
 	private:
 		nodeptr _tail = nullptr;
 
-		void _destroy() override
+		void _destroy()
 		{
-			while (_head)
-			{
-				nodeptr next = _head->_next;
-				this->_delete_node(_head);
-				_head = next;
-			}
+			_MyBase::_destroy();
 			_tail = nullptr;
 		}
 
@@ -886,16 +890,24 @@ namespace lyf
 		void _add_node_front(Node *node)
 		{
 			node->_next = _head;
-			this->_assign_node(_head->_prev, node);
-			this->_assign_node(_head, node);
+			auto np = this->_new_node(node);
+			if (_head)
+				_head->_prev = np;
+			_head = np;
+			if (!_tail)
+				_tail = np;
 			_size++;
 		}
 
 		void _add_node_back(Node *node)
 		{
 			node->_prev = _tail;
-			this->_assign_node(_tail->_next, node);
-			this->_assign_node(_tail, node);
+			auto np = this->_new_node(node);
+			if (_tail)
+				_tail->_next = np;
+			_tail = np;
+			if (!_head)
+				_head = np;
 			_size++;
 		}
 
