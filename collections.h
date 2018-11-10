@@ -723,6 +723,7 @@ namespace lyf
 			return ret;
 		}
 
+		// the tail value
 		value_type tail() const
 		{
 			return _tail->value();
@@ -767,7 +768,7 @@ namespace lyf
 		// construct node at list tail
 		template<typename... Types>
 		void emplace_back(Types&&... args)
-		{	// construct node at list head
+		{
 			_add_node_back(new Node(this, std::forward<Types>(args)...));
 		}
 
