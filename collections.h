@@ -965,5 +965,27 @@ namespace lyf
 	template<typename Valt>
 	using SharedLinkedList = LinkedList<Valt, SharedNode<Valt>>;
 
+
+
+	template<typename KeyT, typename ValT>
+	class HashTable
+	{
+	public:
+		using key_type = KeyT;
+		using value_type = ValT;
+
+	public:
+		HashTable();
+
+		~HashTable();
+
+		value_type &operator[](const key_type &key);
+
+		void insert(const key_type &key, const value_type &value);
+		template<typename... Types>
+		void emplace(const key_type &key, Types&&... args);
+		void remove(const key_type &key);
+		key_type search(const value_type &value);
+	};
 }
 
