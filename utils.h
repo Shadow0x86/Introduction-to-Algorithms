@@ -709,14 +709,14 @@ namespace lyf
 	};
 	
 	template<typename T>
-	size_t hash(const T &v, std::decay_t<decltype(std::hash<T>())>* = nullptr)
+	INLINE size_t hash(const T &v, std::decay_t<decltype(std::hash<T>())>* = nullptr)
 	{
 		static std::hash<T> h;
 		return h(v);
 	}
 
 	template<typename T>
-	size_t hash(const T &v, std::decay_t<decltype(v.hash())>* = nullptr)
+	INLINE size_t hash(const T &v, std::decay_t<decltype(v.hash())>* = nullptr)
 	{
 		return v.hash();
 	}

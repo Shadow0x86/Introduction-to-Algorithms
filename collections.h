@@ -981,11 +981,18 @@ namespace lyf
 
 		value_type &operator[](const key_type &key);
 
+		void size() const;
+		void empty() const;
+		void clear();
+
 		void insert(const key_type &key, const value_type &value);
+
 		template<typename... Types>
 		void emplace(const key_type &key, Types&&... args);
+
 		void remove(const key_type &key);
 		key_type search(const value_type &value);
+		
 	};
 }
 
