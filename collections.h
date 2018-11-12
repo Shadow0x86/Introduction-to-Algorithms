@@ -157,8 +157,9 @@ namespace lyf
 		}
 
 	private:
-		using Base::Base;
 		nodeptr _next = nullptr;
+
+		using _MyBase::_MyBase;
 
 		ForwardLinkedListNode() {}
 
@@ -206,14 +207,15 @@ namespace lyf
 		}
 
 	private:
-		using Base::Base;
 		nodeptr _prev = nullptr;
 		nodeptr _next = nullptr;
+
+		using _MyBase::_MyBase;
 
 		LinkedListNode() {}
 
 		LinkedListNode(const LinkedListNode &rhs)
-			: Base(rhs), _prev(), _next()
+			: _MyBase(rhs), _prev(), _next()
 		{
 		}
 
@@ -261,6 +263,7 @@ namespace lyf
 			node.reset();
 #else
 			delete node;
+			node = nullptr;
 #endif
 		}
 
@@ -359,7 +362,7 @@ namespace lyf
 	public:
 		using value_type = Valt;
 		using Node = ForwardLinkedListNode<value_type, BaseNode>;
-		using _MyBase = _BaseLinkedList<value_type, ForwardLinkedListNode<value_type, BaseNode>>;
+		using _MyBase = _BaseLinkedList<value_type, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename _MyBase::nodeptr;
 
@@ -973,6 +976,7 @@ namespace lyf
 	public:
 		using key_type = KeyT;
 		using value_type = ValT;
+		using entry_type = std::pair<key_type, value_type>;
 
 	public:
 		HashTable();
@@ -981,8 +985,12 @@ namespace lyf
 
 		value_type &operator[](const key_type &key);
 
-		void size() const;
-		void empty() const;
+		size_t size() const;
+		size_t max_size() const;
+		bool empty() const
+		{
+			return size() == 0;
+		}
 		void clear();
 
 		void insert(const key_type &key, const value_type &value);
@@ -993,6 +1001,8 @@ namespace lyf
 		void remove(const key_type &key);
 		key_type search(const value_type &value);
 		
+	private:
+
 	};
 }
 
