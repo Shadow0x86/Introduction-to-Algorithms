@@ -62,6 +62,11 @@ namespace lyf
 			_same_flag = 1 - _same_flag;
 		}
 
+		void reset_neighbors()
+		{
+			_parent = _left = _right = nullptr;
+		}
+
 		using _MyBase::_MyBase;
 
 		BSTNode() {}
@@ -104,6 +109,7 @@ namespace lyf
 		static void _delete_node(nodeptr &np)
 		{
 #if DEBUG
+			np->reset_neighbors();
 			np->setCont();
 			np.reset();
 #else
@@ -176,27 +182,130 @@ namespace lyf
 		{
 			return _root;
 		}
-		nodeptr search(const value_type &value) const;
-		nodeptr max_node() const;
+
+		nodeptr search(const value_type &value) const
+		{
+			nodeptr np = _root;
+			while (np)
+			{
+				if (np->value() == value)
+					break;
+				else if (np->value() < value)
+					np = np->_right;
+				else
+					np = np->_left;
+			}
+			return np;
+		}
+
+		nodeptr max_node(nodeptr np = nullptr) const
+		{
+			if (!np)
+				np = _root;
+			this->_ensureInTree(np);
+			if (np)
+				while (np->_right)
+					np = np->_right;
+			return np;
+		}
+
 		value_type max_value() const
 		{
 			return this->max_node()->value();
 		}
-		nodeptr min_node() const;
+
+		nodeptr min_node(nodeptr np = nullptr) const
+		{
+			if (!np)
+				np = _root;
+			this->_ensureInTree(np);
+			if (np)
+				while (np->_left)
+					np = np->_left;
+			return np;
+		}
+
 		value_type min_value() const
 		{
 			return this->min_node()->value();
 		}
-		nodeptr successor(nodeptr np) const;
-		nodeptr predecessor(nodeptr np) const;
 
-		void remove(nodeptr np);
-		bool remove(const value_type &value);
+		nodeptr successor(nodeptr np) const
+		{
+			this->_ensureInTree(np);
+			if (np->_right)
+				return this->min_node(np->_right);
+			nodeptr p;
+			while ((p = np->_parent) && p->_left != np)
+				np = p;
+			return p;
+		}
+
+		nodeptr predecessor(nodeptr np) const
+		{
+			this->_ensureInTree(np);
+			if (np->_left)
+				return this->max_node(np->_left);
+			nodeptr p;
+			while ((p = np->_parent) && p->_right != np)
+				np = p;
+			return p;
+		}
+
+		void remove(nodeptr &np)
+		{
+			this->_ensureInTree(np);
+			nodeptr new_np;
+			if (!(np->_left && np->_right))
+			{
+				new_np = np->_left ? np->_left : np->_right;
+			}
+			else
+			{
+				new_np = this->successor(np);
+				if (new_np != np->_right)
+				{
+					new_np->_parent->_left = new_np->_right;
+					new_np->_right->_parent = new_np->_parent;
+					new_np->_right = np->_right;
+					np->_right->_parent = new_np;
+				}
+				new_np->_left = np->_left;
+				np->_left->_parent = new_np;
+			}
+			if (np->_parent)
+			{
+				if (np->_parent->_left == np)
+					np->_parent->_left = new_np;
+				else
+					np->_parent->_right = new_np;
+			}
+			else
+				_root = new_np;
+			new_np->_parent = np->_parent;
+
+			this->_delete_node(np);
+		}
+
+		bool remove(const value_type &value)
+		{
+			nodeptr np = this->search(value);
+			if (!np)
+				return false;
+			this->remove(np);
+			return true;
+		}
+
 		void clear();
 
 	private:
 		nodeptr _root = nullptr;
 		size_t _size = 0;
+
+		void _ensureInTree(const nodeptr &np) const
+		{
+			np->_ensureInCont(this);
+		}
 
 		template<typename Iter>
 		void _build(Iter begin, Iter end);
