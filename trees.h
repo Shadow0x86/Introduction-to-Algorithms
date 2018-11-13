@@ -124,7 +124,7 @@ namespace lyf
 		}
 	};
 
-	template<typename Valt, typename BaseNode>
+	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
 	class BinarySearchTree : public _CheckedBST<BSTNode<Valt, BaseNode>>
 	{
 	public:
@@ -140,17 +140,49 @@ namespace lyf
 		{
 		}
 
-		BinarySearchTree(std::initializer_list<value_type> list);
+		BinarySearchTree(std::initializer_list<value_type> list)
+			: BinarySearchTree(list.begin(), list.end())
+		{
+		}
 
 		template<typename Iter>
-		BinarySearchTree(Iter begin, Iter end);
+		BinarySearchTree(Iter begin, Iter end)
+		{
+			for (auto it = begin; it != end; it++)
+			{
+				this->insert(*it);
+			}
+		}
 
 		BinarySearchTree(const BinarySearchTree &rhs);
-		BinarySearchTree(BinarySearchTree &&rhs);
-		BinarySearchTree &operator=(const BinarySearchTree &rhs);
-		BinarySearchTree &operator=(BinarySearchTree &&rhs);
 
-		~BinarySearchTree();
+		BinarySearchTree(BinarySearchTree &&rhs)
+			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
+		{
+			rhs._root = nullptr;
+			rhs._size = 0;
+		}
+
+		BinarySearchTree &operator=(const BinarySearchTree &rhs);
+
+		BinarySearchTree &operator=(BinarySearchTree &&rhs)
+		{
+			if (this != &rhs)
+			{
+				this->_destroy_subtree();
+				_MyBase::operator=(std::move(rhs));
+				_root = std::move(rhs._root);
+				_size = rhs._size;
+				rhs._root = nullptr;
+				rhs._size = 0;
+			}
+			return *this;
+		}
+
+		~BinarySearchTree()
+		{
+			this->_destroy_subtree();
+		}
 
 		size_t size() const
 		{
@@ -202,10 +234,12 @@ namespace lyf
 		{
 			if (!np)
 				np = _root;
-			this->_ensureInTree(np);
 			if (np)
+			{
+				this->_ensureInTree(np);
 				while (np->_right)
 					np = np->_right;
+			}
 			return np;
 		}
 
@@ -218,10 +252,12 @@ namespace lyf
 		{
 			if (!np)
 				np = _root;
-			this->_ensureInTree(np);
 			if (np)
+			{
+				this->_ensureInTree(np);
 				while (np->_left)
 					np = np->_left;
+			}
 			return np;
 		}
 
@@ -252,7 +288,7 @@ namespace lyf
 			return p;
 		}
 
-		void remove(nodeptr &np)
+		void remove(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr new_np;
@@ -262,7 +298,7 @@ namespace lyf
 			}
 			else
 			{
-				new_np = this->successor(np);
+				new_np = this->min_node(np->_right);
 				if (new_np != np->_right)
 				{
 					new_np->_parent->_left = new_np->_right;
@@ -282,9 +318,11 @@ namespace lyf
 			}
 			else
 				_root = new_np;
-			new_np->_parent = np->_parent;
+			if (new_np)
+				new_np->_parent = np->_parent;
 
 			this->_delete_node(np);
+			_size--;
 		}
 
 		bool remove(const value_type &value)
@@ -296,7 +334,11 @@ namespace lyf
 			return true;
 		}
 
-		void clear();
+		void clear()
+		{
+			_destroy_subtree();
+			_size = 0;
+		}
 
 	private:
 		nodeptr _root = nullptr;
@@ -306,9 +348,6 @@ namespace lyf
 		{
 			np->_ensureInCont(this);
 		}
-
-		template<typename Iter>
-		void _build(Iter begin, Iter end);
 
 		void _insert_node(Node *pNode)
 		{
@@ -345,7 +384,35 @@ namespace lyf
 			_size++;
 		}
 
-		static void _copy_subtree(BinarySearchTree &dst, const BinarySearchTree &src, nodeptr root);
-		void _destroy();
+		static void _copy_subtree(BinarySearchTree &dst, const BinarySearchTree &src, nodeptr np);
+
+		void _destroy_subtree_recursive(nodeptr np)
+		{
+			nodeptr right;
+			while (np)
+			{
+				_destroy_subtree_recursive(np->_left);
+				right = np->_right;
+				this->_delete_node(np);
+				_size--;
+				np = right;
+			}
+		}
+
+		void _destroy_subtree(nodeptr np = nullptr)
+		{
+			if (!np)
+				np = _root;
+			if (np->_parent)
+			{
+				if (np->_parent->_left == np)
+					np->_parent->_left = nullptr;
+				else
+					np->_parent->_right = nullptr;
+			}
+			else
+				_root = nullptr;
+			_destroy_recursive(np);
+		}
 	};
 }
