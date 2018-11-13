@@ -366,6 +366,46 @@ namespace lyf
 			_size = 0;
 		}
 
+		void left_rotate(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			nodeptr right = np->_right;
+			if (!right)
+				return;
+			np->_right = right->_left;
+			if (right->_left)
+				right->_left->_parent = np;
+			if (!(np->_parent))
+				_root = right;
+			else if (np == np->_parent->_left)
+				np->_parent->_left = right;
+			else
+				np->_parent->_right = right;
+			right->_parent = np->_parent;
+			right->_left = np;
+			np->_parent = right;
+		}
+
+		void right_rotate(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			nodeptr left = np->_left;
+			if (!left)
+				return;
+			np->_left = left->_right;
+			if (left->_right)
+				left->_right->_parent = np;
+			if (!(np->_parent))
+				_root = left;
+			else if (np == np->_parent->_right)
+				np->_parent->_right = left;
+			else
+				np->_parent->_left = left;
+			left->_parent = np->_parent;
+			left->_right = np;
+			np->_parent = left;
+		}
+
 	private:
 		nodeptr _root = nullptr;
 		size_t _size = 0;
