@@ -124,7 +124,7 @@ namespace lyf
 				auto prev = innerit - 1;
 				if (iter_less(innerit, prev))
 				{
-					swap_by_iter(perv, innerit);
+					swap_by_iter(prev, innerit);
 				}
 			}
 		}

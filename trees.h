@@ -33,6 +33,11 @@ namespace lyf
 			return *this;
 		}
 
+		const Valt &value()
+		{
+			return _MyBase::value();
+		}
+
 		nodeptr parent() const
 		{
 			this->_ensureInCont();
@@ -88,6 +93,7 @@ namespace lyf
 		using nodeptr = Node * ;
 #endif
 
+	protected:
 		static nodeptr _new_node(Node *pNode)
 		{
 #if DEBUG
@@ -110,7 +116,7 @@ namespace lyf
 		{
 #if DEBUG
 			np->reset_neighbors();
-			np->setCont();
+			np->_setCont();
 			np.reset();
 #else
 			delete np;
@@ -154,7 +160,11 @@ namespace lyf
 			}
 		}
 
-		BinarySearchTree(const BinarySearchTree &rhs);
+		BinarySearchTree(const BinarySearchTree &rhs)
+			: BinarySearchTree()
+		{
+			this->_copy_subtree(*this, rhs, rhs._root);
+		}
 
 		BinarySearchTree(BinarySearchTree &&rhs)
 			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
@@ -163,14 +173,23 @@ namespace lyf
 			rhs._size = 0;
 		}
 
-		BinarySearchTree &operator=(const BinarySearchTree &rhs);
+		BinarySearchTree &operator=(const BinarySearchTree &rhs)
+		{
+			_MyBase::operator=(rhs);
+			if (this != &rhs)
+			{
+				this->clear();
+				this->_copy_subtree(*this, rhs, rhs._root);
+			}
+			return *this;
+		}
 
 		BinarySearchTree &operator=(BinarySearchTree &&rhs)
 		{
+			_MyBase::operator=(std::move(rhs));
 			if (this != &rhs)
 			{
 				this->_destroy_subtree();
-				_MyBase::operator=(std::move(rhs));
 				_root = std::move(rhs._root);
 				_size = rhs._size;
 				rhs._root = nullptr;
@@ -182,6 +201,13 @@ namespace lyf
 		~BinarySearchTree()
 		{
 			this->_destroy_subtree();
+		}
+
+		BinarySearchTree sub_tree(nodeptr np)
+		{
+			BinarySearchTree ret;
+			this->_copy_subtree(ret, *this, np);
+			return ret;
 		}
 
 		size_t size() const
@@ -384,7 +410,45 @@ namespace lyf
 			_size++;
 		}
 
-		static void _copy_subtree(BinarySearchTree &dst, const BinarySearchTree &src, nodeptr np);
+		static void _copy_subtree_recursive(nodeptr dst_np, nodeptr src_np, size_t &size)
+		{
+			while (src_np)
+			{
+				if (src_np->_left)
+				{
+					dst_np->_left = check_t::_new_node(new Node(*(src_np->_left)));
+					dst_np->_left->_parent = dst_np;
+					dst_np->_left->_setCont(&dst_np);
+					size++;
+				}
+				if (src_np->_right)
+				{
+					dst_np->_right = check_t::_new_node(new Node(*(src_np->_right)));
+					dst_np->_right->_parent = dst_np;
+					dst_np->_right->_setCont(&dst_np);
+					size++;
+				}
+				_copy_subtree_recursive(dst_np->_left, src_np->_left, size);
+				dst_np = dst_np->_right;
+				src_np = src_np->_right;
+			}
+		}
+
+		static void _copy_subtree(BinarySearchTree &dst, const BinarySearchTree &src, nodeptr np)
+		{
+			if (np)
+				src._ensureInTree(np);
+			dst._destroy_subtree();
+			nodeptr curr;
+			if (np)
+			{
+				curr = check_t::_new_node(new Node(*np));
+				dst._root = curr;
+				curr->_setCont(&dst);
+				dst._size++;
+			}
+			_copy_subtree_recursive(dst._root, np, dst._size);
+		}
 
 		void _destroy_subtree_recursive(nodeptr np)
 		{
@@ -403,7 +467,7 @@ namespace lyf
 		{
 			if (!np)
 				np = _root;
-			if (np->_parent)
+			if (np && np->_parent)
 			{
 				if (np->_parent->_left == np)
 					np->_parent->_left = nullptr;
@@ -412,7 +476,7 @@ namespace lyf
 			}
 			else
 				_root = nullptr;
-			_destroy_recursive(np);
+			_destroy_subtree_recursive(np);
 		}
 	};
 }
