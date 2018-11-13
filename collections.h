@@ -369,6 +369,21 @@ namespace lyf
 	public:
 		ForwardLinkedList() {}
 
+		ForwardLinkedList(std::initializer_list<value_type> list)
+			: ForwardLinkedList(list.begin(), list.end())
+		{
+		}
+
+		template<typename Iter>
+		ForwardLinkedList(Iter begin, Iter end)
+		{
+			auto _riters = riters(begin, end);
+			for (auto it = _riters.first; it != _riters.second; it++)
+			{
+				this->push(*it);
+			}
+		}
+
 		ForwardLinkedList(const ForwardLinkedList &rhs)
 		{
 			ForwardLinkedList::_copy_sublist(*this, rhs, rhs.head_node());
@@ -514,11 +529,13 @@ namespace lyf
 	private:
 		static void _copy_sublist(ForwardLinkedList &dst, const ForwardLinkedList &src, nodeptr begin, nodeptr end = nullptr)
 		{
+			if (begin)
+				src._ensureInList(begin);
+			if (end)
+				src._ensureInList(end);
 			dst.clear();
 			nodeptr curr;
-			nodeptr nd = src.head_node();
-			while (nd && nd != begin)
-				nd = nd->_next;
+			nodeptr nd = begin;
 			if (nd && nd != end)
 			{
 				curr = check_t::_new_node(new Node(*nd));
@@ -528,7 +545,7 @@ namespace lyf
 				dst._size++;
 			}
 			while (nd != end)
-			{	// if end is ahead of begin, a null pointer will be dereference
+			{	// if end is ahead of begin, a null pointer will be dereferenced
 				curr->_next = check_t::_new_node(new Node(*nd));
 				curr = curr->_next;
 				curr->_setCont(&dst);
@@ -628,6 +645,20 @@ namespace lyf
 
 	public:
 		LinkedList() {}
+
+		LinkedList(std::initializer_list<value_type> list)
+			: LinkedList(list.begin(), list.end())
+		{
+		}
+
+		template<typename Iter>
+		LinkedList(Iter begin, Iter end)
+		{
+			for (auto it = begin; it != end; it++)
+			{
+				this->push_back(*it);
+			}
+		}
 
 		LinkedList(const LinkedList &rhs)
 		{
@@ -865,11 +896,13 @@ namespace lyf
 
 		static void _copy_sublist(LinkedList &dst, const LinkedList &src, nodeptr begin, nodeptr end = nullptr)
 		{
+			if (begin)
+				src._ensureInList(begin);
+			if (end)
+				src._ensureInList(end);
 			dst.clear();
 			nodeptr curr;
-			nodeptr nd = src.head_node();
-			while (nd && nd != begin)
-				nd = nd->_next;
+			nodeptr nd = begin;
 			if (nd && nd != end)
 			{
 				curr = check_t::_new_node(new Node(*nd));
@@ -878,8 +911,8 @@ namespace lyf
 				nd = nd->_next;
 				dst._size++;
 			}
-			while (nd && nd != end)
-			{
+			while (nd != end)
+			{	// if end is ahead of begin, a null pointer will be dereferenced
 				curr->_next = check_t::_new_node(new Node(*nd));
 				curr->_next->_prev = curr;
 				curr = curr->_next;

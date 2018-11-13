@@ -357,6 +357,18 @@ namespace lyf
 	{
 		return Iter_traits<Iter>::crend(begin, end);
 	}
+	template<typename Iter>
+	auto riters(Iter begin, Iter end)
+	{
+		using T = Iter_traits<Iter>;
+		return std::make_pair(T::rbegin(begin, end), T::rend(begin, end));
+	}
+	template<typename Iter>
+	auto criters(Iter begin, Iter end)
+	{
+		using T = Iter_traits<Iter>;
+		return std::make_pair(T::crbegin(begin, end), T::crend(begin, end));
+	}
 
 
 	template<typename Iter, typename Key = void*>
