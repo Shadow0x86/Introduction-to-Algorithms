@@ -1,13 +1,10 @@
 #pragma once
-#include <memory>
 #include "utils.h"
 
 
 
 namespace lyf
 {
-	template<typename Node>
-	class _CheckedBST;
 
 	template<typename Valt, typename BaseNode>
 	class BinarySearchTree;
@@ -16,22 +13,14 @@ namespace lyf
 	template<typename Valt, typename Base>
 	class BSTNode : public Base
 	{
-		friend class _CheckedBST<BSTNode>;
+		friend class _CheckedNodeContainer<BSTNode>;
 		friend class BinarySearchTree<Valt, Base>;
 
 	public:
 		using _MyBase = Base;
-		using nodeptr = typename _CheckedBST<BSTNode>::nodeptr;
+		using nodeptr = typename _CheckedNodeContainer<BSTNode>::nodeptr;
 
-		BSTNode &operator=(const BSTNode &rhs)
-		{
-			this->_ensureInCont();
-			if (this != &rhs)
-			{
-				_MyBase::operator=(rhs);
-			}
-			return *this;
-		}
+		BSTNode &operator=(const BSTNode &rhs) = delete;
 
 		const Valt &value()
 		{
@@ -56,7 +45,7 @@ namespace lyf
 			return _right;
 		}
 
-	private:
+	protected:
 		nodeptr _parent = nullptr;
 		nodeptr _left = nullptr;
 		nodeptr _right = nullptr;
@@ -82,62 +71,15 @@ namespace lyf
 		}
 	};
 
-	template<typename Node>
-	class _CheckedBST
-	{
-	public:
-
-#if DEBUG
-		using nodeptr = std::shared_ptr<Node>;
-#else
-		using nodeptr = Node * ;
-#endif
-
-	protected:
-		static nodeptr _new_node(Node *pNode)
-		{
-#if DEBUG
-			return nodeptr(pNode);
-#else
-			return pNode;
-#endif
-		}
-
-		static void _assign_node(nodeptr &ln, Node *pNode)
-		{
-#if DEBUG
-			ln.reset(pNode);
-#else
-			ln = pNode;
-#endif
-		}
-
-		static void _delete_node(nodeptr &np)
-		{
-#if DEBUG
-			np->reset_neighbors();
-			np->_setCont();
-			np.reset();
-#else
-			delete np;
-			np = nullptr;
-#endif
-		}
-
-		static void _set_out(nodeptr &np)
-		{
-			np->setCont();
-		}
-	};
 
 	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
-	class BinarySearchTree : public _CheckedBST<BSTNode<Valt, BaseNode>>
+	class BinarySearchTree : public _CheckedNodeContainer<BSTNode<Valt, BaseNode>>
 	{
 	public:
 		using value_type = Valt;
 		using Node = BSTNode<Valt, BaseNode>;
-		using _MyBase = _CheckedBST<Node>;
-		using check_t = _CheckedBST<Node>;
+		using _MyBase = _CheckedNodeContainer<Node>;
+		using check_t = _CheckedNodeContainer<Node>;
 		using nodeptr = typename check_t::nodeptr;
 
 	public:
@@ -487,8 +429,9 @@ namespace lyf
 
 		static void _copy_subtree(BinarySearchTree &dst, const BinarySearchTree &src, nodeptr np)
 		{
-			if (np)
-				src._ensureInTree(np);
+			if (!np)
+				throw std::runtime_error("Subtree's root can't be null");
+			src._ensureInTree(np);
 			dst._destroy_subtree();
 			nodeptr curr;
 			if (np)

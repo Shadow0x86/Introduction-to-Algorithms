@@ -620,6 +620,54 @@ namespace lyf
 	};
 
 
+	template<typename Node>
+	class _CheckedNodeContainer
+	{
+	public:
+#if DEBUG
+		using nodeptr = std::shared_ptr<Node>;
+#else
+		using nodeptr = Node * ;
+#endif
+
+	protected:
+		static nodeptr _new_node(Node *pNode)
+		{
+#if DEBUG
+			return nodeptr(pNode);
+#else
+			return pNode;
+#endif
+		}
+
+		static void _assign_node(nodeptr &ln, Node *pNode)
+		{
+#if DEBUG
+			ln.reset(pNode);
+#else
+			ln = pNode;
+#endif
+		}
+
+		static void _delete_node(nodeptr &np)
+		{
+#if DEBUG
+			np->reset_neighbors();
+			np->_setCont();
+			np.reset();
+#else
+			delete np;
+			np = nullptr;
+#endif
+		}
+
+		static void _set_out(nodeptr &np)
+		{
+			np->_setCont();
+		}
+	};
+
+
 	template<typename Valt>
 	class SharedNode : public _CheckedNode
 	{

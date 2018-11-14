@@ -118,9 +118,6 @@ namespace lyf
 	};
 
 
-	template<typename Node>
-	class _CheckedLinkedList;
-
 	template<typename Valt, typename Node>
 	class _BaseLinkedList;
 
@@ -133,12 +130,12 @@ namespace lyf
 	template<typename Valt, typename Base>
 	class ForwardLinkedListNode : public Base
 	{
-		friend class _CheckedLinkedList<ForwardLinkedListNode>;
+		friend class _CheckedNodeContainer<ForwardLinkedListNode>;
 		friend class _BaseLinkedList<Valt, ForwardLinkedListNode>;
 		friend class ForwardLinkedList<Valt, Base>;
 	public:
 		using _MyBase = Base;
-		using nodeptr = typename _CheckedLinkedList<ForwardLinkedListNode>::nodeptr;
+		using nodeptr = typename _CheckedNodeContainer<ForwardLinkedListNode>::nodeptr;
 
 		ForwardLinkedListNode &operator=(const ForwardLinkedListNode &rhs)
 		{	// not change next
@@ -178,12 +175,12 @@ namespace lyf
 	template<typename Valt, typename Base>
 	class LinkedListNode : public Base
 	{
-		friend class _CheckedLinkedList<LinkedListNode>;
+		friend class _CheckedNodeContainer<LinkedListNode>;
 		friend class _BaseLinkedList<Valt, LinkedListNode>;
 		friend class LinkedList<Valt, Base>;
 	public:
 		using _MyBase = Base;
-		using nodeptr = typename _CheckedLinkedList<LinkedListNode>::nodeptr;
+		using nodeptr = typename _CheckedNodeContainer<LinkedListNode>::nodeptr;
 
 		LinkedListNode &operator=(const LinkedListNode &rhs)
 		{	// not change prev and next
@@ -226,59 +223,13 @@ namespace lyf
 
 	};
 
-	template<typename Node>
-	class _CheckedLinkedList
-	{
-	public:
-#if DEBUG
-		using nodeptr = std::shared_ptr<Node>;
-#else
-		using nodeptr = Node * ;
-#endif
-
-	protected:
-		static nodeptr _new_node(Node *pNode)
-		{
-#if DEBUG
-			return nodeptr(pNode);
-#else
-			return pNode;
-#endif
-		}
-
-		static void _assign_node(nodeptr &ln, Node *pNode)
-		{
-#if DEBUG
-			ln.reset(pNode);
-#else
-			ln = pNode;
-#endif
-		}
-
-		static void _delete_node(nodeptr &node)
-		{
-#if DEBUG
-			node->reset_neighbors();
-			node->_setCont();
-			node.reset();
-#else
-			delete node;
-			node = nullptr;
-#endif
-		}
-
-		static void _set_out(nodeptr &node)
-		{
-			node->_setCont();
-		}
-	};
 
 	template<typename Valt, typename Node>
-	class _BaseLinkedList : public _AbsColl<Valt>, public _CheckedLinkedList<Node>
+	class _BaseLinkedList : public _AbsColl<Valt>, public _CheckedNodeContainer<Node>
 	{
 	public:
 		using value_type = Valt;
-		using check_t = _CheckedLinkedList<Node>;
+		using check_t = _CheckedNodeContainer<Node>;
 		using nodeptr = typename check_t::nodeptr;
 
 		~_BaseLinkedList()
