@@ -566,9 +566,6 @@ namespace lyf
 
 	class _CheckedNode
 	{
-	public:
-		virtual ~_CheckedNode() {}
-
 	protected:
 		_CheckedNode() {}
 

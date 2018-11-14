@@ -9,18 +9,13 @@ namespace lyf
 	template<typename Valt, typename BaseNode>
 	class BinarySearchTree;
 
-	// Node class of binary search tree
-	template<typename Valt, typename Base>
-	class BSTNode : public Base
+	template<typename Valt, typename Base, typename nodeptr>
+	class _BaseBSTNode : public Base
 	{
-		friend class _CheckedNodeContainer<BSTNode>;
-		friend class BinarySearchTree<Valt, Base>;
-
 	public:
 		using _MyBase = Base;
-		using nodeptr = typename _CheckedNodeContainer<BSTNode>::nodeptr;
 
-		BSTNode &operator=(const BSTNode &rhs) = delete;
+		_BaseBSTNode &operator=(const _BaseBSTNode &) = delete;
 
 		const Valt &value()
 		{
@@ -49,12 +44,6 @@ namespace lyf
 		nodeptr _parent = nullptr;
 		nodeptr _left = nullptr;
 		nodeptr _right = nullptr;
-		unsigned char _same_flag = 0;
-
-		void reverse_flag()
-		{
-			_same_flag = 1 - _same_flag;
-		}
 
 		void reset_neighbors()
 		{
@@ -63,10 +52,40 @@ namespace lyf
 
 		using _MyBase::_MyBase;
 
+		_BaseBSTNode() {}
+
+		_BaseBSTNode(const _BaseBSTNode &rhs)
+			: _MyBase(rhs), _parent(), _left(), _right()
+		{
+		}
+	};
+
+	// Node class of binary search tree
+	template<typename Valt, typename Base>
+	class BSTNode : public _BaseBSTNode<Valt, Base, 
+		typename _CheckedNodeContainer<BSTNode<Valt, Base>>::nodeptr>
+	{
+		friend class _CheckedNodeContainer<BSTNode>;
+		friend class BinarySearchTree<Valt, Base>;
+
+	public:
+		using nodeptr = typename _CheckedNodeContainer<BSTNode>::nodeptr;
+		using _MyBase = _BaseBSTNode<Valt, Base, nodeptr>;
+
+	private:
+		unsigned char _same_flag = 0;
+
+		void reverse_flag()
+		{
+			_same_flag = 1 - _same_flag;
+		}
+
+		using _MyBase::_MyBase;
+
 		BSTNode() {}
 
 		BSTNode(const BSTNode &rhs)
-			: _MyBase(rhs), _parent(), _left(), _right(), _same_flag()
+			: _MyBase(rhs), _same_flag()
 		{
 		}
 	};
@@ -473,4 +492,330 @@ namespace lyf
 			_destroy_subtree_recursive(np);
 		}
 	};
+
+
+	template<typename Valt, typename BaseNode>
+	class RedBlackTree;
+
+	enum class RBTNodeColor { RED, BLACK };
+
+	// Node class of red-black tree
+	template<typename Valt, typename Base>
+	class RBTNode : public _BaseBSTNode<Valt, Base,
+		typename _CheckedNodeContainer<RBTNode<Valt, Base>>::nodeptr>
+	{
+		friend class _CheckedNodeContainer<RBTNode>;
+		friend class RedBlackTree<Valt, Base>;
+
+	public:
+		using nodeptr = typename _CheckedNodeContainer<RBTNode>::nodeptr;
+		using _MyBase = _BaseBSTNode<Valt, Base, nodeptr>;
+
+		RBTNodeColor color() const
+		{
+			this->_ensureInCont();
+			return _color;
+		}
+
+	private:
+		RBTNodeColor _color = RBTNodeColor::BLACK;
+
+		void _set_neighbors(nodeptr np)
+		{
+			_parent = _left = _right = np;
+		}
+
+		using _MyBase::_MyBase;
+
+		RBTNode()
+			: _MyBase(), _color(RBTNodeColor::BLACK)
+		{
+		}
+
+		RBTNode(const RBTNode &rhs)
+			: _MyBase(rhs), _color()
+		{
+		}
+	};
+
+	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
+	class RedBlackTree : public _CheckedNodeContainer<RBTNode<Valt, BaseNode>>
+	{
+	public:
+		using value_type = Valt;
+		using Node = RBTNode<Valt, BaseNode>;
+		using _MyBase = _CheckedNodeContainer<Node>;
+		using check_t = _CheckedNodeContainer<Node>;
+		using nodeptr = typename check_t::nodeptr;
+
+	public:
+		RedBlackTree()
+			: _MyBase(), _root(_NULL_NODE), _size()
+		{
+		}
+
+		RedBlackTree(std::initializer_list<value_type> list)
+			: RedBlackTree(list.begin(), list.end())
+		{
+		}
+
+		template<typename Iter>
+		RedBlackTree(Iter begin, Iter end)
+		{
+			for (auto it = begin; it != end; it++)
+			{
+				this->insert(*it);
+			}
+		}
+
+		RedBlackTree(const RedBlackTree &rhs)
+			: RedBlackTree()
+		{
+			this->_copy_subtree(*this, rhs, rhs._root);
+		}
+
+		RedBlackTree(RedBlackTree &&rhs)
+			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
+		{
+			rhs._root = _NULL_NODE;
+			rhs._size = 0;
+		}
+
+		RedBlackTree &operator=(const RedBlackTree &rhs)
+		{
+			_MyBase::operator=(rhs);
+			if (this != &rhs)
+			{
+				this->clear();
+				this->_copy_subtree(*this, rhs, rhs._root);
+			}
+			return *this;
+		}
+
+		RedBlackTree &operator=(RedBlackTree &&rhs)
+		{
+			_MyBase::operator=(std::move(rhs));
+			if (this != &rhs)
+			{
+				this->_destroy_subtree();
+				_root = std::move(rhs._root);
+				_size = rhs._size;
+				rhs._root = _NULL_NODE;
+				rhs._size = 0;
+			}
+			return *this;
+		}
+
+		~RedBlackTree()
+		{
+			this->_destroy_subtree();
+		}
+
+		// A copy of the subtree rooted at the given node
+		RedBlackTree subtree(nodeptr np)
+		{
+			RedBlackTree ret;
+			this->_copy_subtree(ret, *this, np);
+			return ret;
+		}
+
+		size_t size() const
+		{
+			return _size;
+		}
+
+		bool empty() const
+		{
+			return size() == 0;
+		}
+
+		void insert(const value_type &value)
+		{
+			this->_insert_node(new Node(this, value));
+		}
+
+		void insert(value_type &&value)
+		{
+			this->_insert_node(new Node(this, std::move(value)));
+		}
+
+		template<typename... Types>
+		void emplace(Types&&... args)
+		{
+			this->_insert_node(new Node(this, std::forward<Types>(args)...));
+		}
+
+		nodeptr root() const
+		{
+			return this->_conv_null_np(_root);
+		}
+
+		nodeptr search(const value_type &value) const
+		{
+			nodeptr np = _root;
+			while (np != _NULL_NODE)
+			{
+				if (np->value() == value)
+					break;
+				else if (np->value() < value)
+					np = np->_right;
+				else
+					np = np->_left;
+			}
+			return this->_conv_null_np(np);
+		}
+
+		// The node of maximum value in subtree which rooted at the given node(default root)
+		nodeptr max_node(nodeptr np = nullptr) const
+		{
+			if (!np || np == _NULL_NODE)
+				np = _root;
+			if (np != _NULL_NODE)
+			{
+				this->_ensureInTree(np);
+				while (np->_right != _NULL_NODE)
+					np = np->_right;
+			}
+			return this->_conv_null_np(np);
+		}
+
+		// The maximum value in subtree which rooted at the given node(default root)
+		value_type max_value(nodeptr np = nullptr) const
+		{
+			return this->max_node(np)->value();
+		}
+
+		// The node of minimum value in subtree which rooted at the given node(default root)
+		nodeptr min_node(nodeptr np = nullptr) const
+		{
+			if (!np || np == _NULL_NODE)
+				np = _root;
+			if (np != _NULL_NODE)
+			{
+				this->_ensureInTree(np);
+				while (np->_left != _NULL_NODE)
+					np = np->_left;
+			}
+			return this->_conv_null_np(np);
+		}
+
+		// The minimum value in subtree which rooted at the given node(default root)
+		value_type min_value(nodeptr np = nullptr) const
+		{
+			return this->min_node(np)->value();
+		}
+
+		// The node with the smallest key greater than the key of the given node
+		nodeptr successor(nodeptr np) const
+		{
+			this->_ensureInTree(np);
+			if (np->_right != _NULL_NODE)
+				return this->min_node(np->_right);
+			nodeptr p;
+			while ((p = np->_parent) != _NULL_NODE && p->_left != np)
+				np = p;
+			return this->_conv_null_np(p);
+		}
+
+		// The node with the largest key less than the key of the given node
+		nodeptr predecessor(nodeptr np) const
+		{
+			this->_ensureInTree(np);
+			if (np->_left != _NULL_NODE)
+				return this->max_node(np->_left);
+			nodeptr p;
+			while ((p = np->_parent) != _NULL_NODE && p->_right != np)
+				np = p;
+			return this->_conv_null_np(p);
+		}
+
+		void remove(nodeptr np);
+
+		// Remove the value, returns whether it's in the tree or not
+		bool remove(const value_type &value)
+		{
+			nodeptr np = this->search(value);
+			if (!np || np == _NULL_NODE)
+				return false;
+			this->remove(np);
+			return true;
+		}
+
+		void clear()
+		{
+			_destroy_subtree();
+		}
+
+		// left-rotation, preserving the binary-search-tree property
+		// if the right child of the given node is null, do nothing
+		void left_rotate(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			nodeptr right = np->_right;
+			if (right == _NULL_NODE)
+				return;
+			np->_right = right->_left;
+			if (right->_left != _NULL_NODE)
+				right->_left->_parent = np;
+			if (np->_parent == _NULL_NODE)
+				_root = right;
+			else if (np == np->_parent->_left)
+				np->_parent->_left = right;
+			else
+				np->_parent->_right = right;
+			right->_parent = np->_parent;
+			right->_left = np;
+			np->_parent = right;
+		}
+
+		// right-rotation, preserving the binary-search-tree property
+		// if the left child of the given node is null, do nothing
+		void right_rotate(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			nodeptr left = np->_left;
+			if (left == _NULL_NODE)
+				return;
+			np->_left = left->_right;
+			if (left->_right != _NULL_NODE)
+				left->_right->_parent = np;
+			if (np->_parent == _NULL_NODE)
+				_root = left;
+			else if (np == np->_parent->_right)
+				np->_parent->_right = left;
+			else
+				np->_parent->_left = left;
+			left->_parent = np->_parent;
+			left->_right = np;
+			np->_parent = left;
+		}
+
+	private:
+		nodeptr _root = _NULL_NODE;
+		size_t _size = 0;
+
+		static nodeptr const _NULL_NODE;
+
+		static void _set_null_neighbors(nodeptr np)
+		{
+			np->_set_neighbors(_NULL_NODE);
+		}
+
+		static nodeptr _conv_null_np(nodeptr np)
+		{
+			return np == _NULL_NODE ? nullptr : np;
+		}
+
+		void _ensureInTree(const nodeptr &np) const
+		{
+			np->_ensureInCont(this);
+		}
+
+		void _insert_node(Node *pNode);
+	};
+
+	template<typename Valt, typename BaseNode>
+	typename RedBlackTree<Valt, BaseNode>::nodeptr const 
+		RedBlackTree<Valt, BaseNode>::_NULL_NODE = typename RedBlackTree<Valt, BaseNode>::check_t::_new_node(
+			new RedBlackTree<Valt, BaseNode>::Node);
 }
