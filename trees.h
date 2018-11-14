@@ -203,7 +203,8 @@ namespace lyf
 			this->_destroy_subtree();
 		}
 
-		BinarySearchTree sub_tree(nodeptr np)
+		// A copy of the subtree rooted at the given node
+		BinarySearchTree subtree(nodeptr np)
 		{
 			BinarySearchTree ret;
 			this->_copy_subtree(ret, *this, np);
@@ -256,6 +257,7 @@ namespace lyf
 			return np;
 		}
 
+		// The node of maximum value in subtree which rooted at the given node(default root)
 		nodeptr max_node(nodeptr np = nullptr) const
 		{
 			if (!np)
@@ -269,11 +271,13 @@ namespace lyf
 			return np;
 		}
 
-		value_type max_value() const
+		// The maximum value in subtree which rooted at the given node(default root)
+		value_type max_value(nodeptr np = nullptr) const
 		{
-			return this->max_node()->value();
+			return this->max_node(np)->value();
 		}
 
+		// The node of minimum value in subtree which rooted at the given node(default root)
 		nodeptr min_node(nodeptr np = nullptr) const
 		{
 			if (!np)
@@ -287,11 +291,13 @@ namespace lyf
 			return np;
 		}
 
-		value_type min_value() const
+		// The minimum value in subtree which rooted at the given node(default root)
+		value_type min_value(nodeptr np = nullptr) const
 		{
-			return this->min_node()->value();
+			return this->min_node(np)->value();
 		}
 
+		// The node with the smallest key greater than the key of the given node
 		nodeptr successor(nodeptr np) const
 		{
 			this->_ensureInTree(np);
@@ -303,6 +309,7 @@ namespace lyf
 			return p;
 		}
 
+		// The node with the largest key less than the key of the given node
 		nodeptr predecessor(nodeptr np) const
 		{
 			this->_ensureInTree(np);
@@ -351,6 +358,7 @@ namespace lyf
 			_size--;
 		}
 
+		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
 		{
 			nodeptr np = this->search(value);
@@ -363,9 +371,10 @@ namespace lyf
 		void clear()
 		{
 			_destroy_subtree();
-			_size = 0;
 		}
 
+		// left-rotation, preserving the binary-search-tree property
+		// if the right child of the given node is null, do nothing
 		void left_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
@@ -386,6 +395,8 @@ namespace lyf
 			np->_parent = right;
 		}
 
+		// right-rotation, preserving the binary-search-tree property
+		// if the left child of the given node is null, do nothing
 		void right_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
