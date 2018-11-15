@@ -58,14 +58,31 @@ namespace lyf
 			_parent = _left = _right = np;
 		}
 
-		using _MyBase::_MyBase;
-
 		_BaseBSTNode()
 		{
 		}
 
-		_BaseBSTNode(nodeptr np)
-			: _parent(np), _left(np), _right(np)
+		_BaseBSTNode(nodeptr neighbor)
+			: _parent(neighbor), _left(neighbor), _right(neighbor)
+		{
+		}
+
+		_BaseBSTNode(nodeptr neighbor, void *pCont, const Valt &value)
+			: _MyBase(pCont, value), 
+			_parent(neighbor), _left(neighbor), _right(neighbor)
+		{
+		}
+
+		_BaseBSTNode(nodeptr neighbor, void *pCont, Valt &&value)
+			: _MyBase(pCont, std::move(value)), 
+			_parent(neighbor), _left(neighbor), _right(neighbor)
+		{
+		}
+
+		template<typename... Types>
+		_BaseBSTNode(nodeptr neighbor, void *pCont, Types&&... args)
+			: _MyBase(pCont, std::forward<Types>(args)...), 
+			_parent(neighbor), _left(neighbor), _right(neighbor)
 		{
 		}
 
@@ -362,18 +379,18 @@ namespace lyf
 
 		void insert(const value_type &value)
 		{
-			this->_insert_node(new Node(this, value));
+			this->_insert_node(new Node(Node::_pNullNode, this, value));
 		}
 
 		void insert(value_type &&value)
 		{
-			this->_insert_node(new Node(this, std::move(value)));
+			this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
 		}
 
 		template<typename... Types>
 		void emplace(Types&&... args)
 		{
-			this->_insert_node(new Node(this, std::forward<Types>(args)...));
+			this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
@@ -421,50 +438,6 @@ namespace lyf
 				return false;
 			this->remove(np);
 			return true;
-		}
-
-		// left-rotation, preserving the binary-search-tree property
-		// if the right child of the given node is null, do nothing
-		void left_rotate(nodeptr np)
-		{
-			this->_ensureInTree(np);
-			nodeptr right = np->_right;
-			if (right == Node::_pNullNode)
-				return;
-			np->_right = right->_left;
-			if (right->_left != Node::_pNullNode)
-				right->_left->_parent = np;
-			if (np->_parent == Node::_pNullNode)
-				_root = right;
-			else if (np == np->_parent->_left)
-				np->_parent->_left = right;
-			else
-				np->_parent->_right = right;
-			right->_parent = np->_parent;
-			right->_left = np;
-			np->_parent = right;
-		}
-
-		// right-rotation, preserving the binary-search-tree property
-		// if the left child of the given node is null, do nothing
-		void right_rotate(nodeptr np)
-		{
-			this->_ensureInTree(np);
-			nodeptr left = np->_left;
-			if (left == Node::_pNullNode)
-				return;
-			np->_left = left->_right;
-			if (left->_right != Node::_pNullNode)
-				left->_right->_parent = np;
-			if (np->_parent == Node::_pNullNode)
-				_root = left;
-			else if (np == np->_parent->_right)
-				np->_parent->_right = left;
-			else
-				np->_parent->_left = left;
-			left->_parent = np->_parent;
-			left->_right = np;
-			np->_parent = left;
 		}
 
 	private:
@@ -575,7 +548,7 @@ namespace lyf
 
 	private:
 		inline static nodeptr const _pNullNode = check_t::_new_node(new RBTNode(RBTNodeColor::BLACK));
-		RBTNodeColor _color = RBTNodeColor::BLACK;
+		RBTNodeColor _color = RBTNodeColor::RED;
 
 		using _MyBase::_MyBase;
 
@@ -607,7 +580,7 @@ namespace lyf
 
 	public:
 		RedBlackTree()
-			: _MyBase(), _root(Node::_pNullNode), _size()
+			: _MyBase()
 		{
 		}
 
@@ -662,27 +635,27 @@ namespace lyf
 		}
 
 		// A copy of the subtree rooted at the given node
-		RedBlackTree subtree(nodeptr np)
-		{
-			RedBlackTree ret;
-			this->_copy_subtree(ret, *this, np);
-			return ret;
-		}
+		//RedBlackTree subtree(nodeptr np)
+		//{
+		//	RedBlackTree ret;
+		//	this->_copy_subtree(ret, *this, np);
+		//	return ret;
+		//}
 
 		void insert(const value_type &value)
 		{
-			this->_insert_node(new Node(this, value));
+			this->_insert_node(new Node(Node::_pNullNode, this, value));
 		}
 
 		void insert(value_type &&value)
 		{
-			this->_insert_node(new Node(this, std::move(value)));
+			this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
 		}
 
 		template<typename... Types>
 		void emplace(Types&&... args)
 		{
-			this->_insert_node(new Node(this, std::forward<Types>(args)...));
+			this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np);
@@ -742,8 +715,87 @@ namespace lyf
 		}
 
 	private:
+		void _insert_node(Node *pNode)
+		{
+			nodeptr np = check_t::_new_node(pNode);
+			const value_type &npv = np->value();
+			nodeptr curr = _root, p = Node::_pNullNode;
+			while (curr != Node::_pNullNode)
+			{
+				p = curr;
+				if (curr->value() < npv)
+					curr = curr->_right;
+				else
+					curr = curr->_left;
+			}
+			if (p == Node::_pNullNode)
+				_root = np;
+			else
+			{
+				if (p->value() < npv)
+					p->_right = np;
+				else
+					p->_left = np;
+				np->_parent = p;
+			}
+			_size++;
+			_insert_node_fixup(np);
+		}
 
-		void _insert_node(Node *pNode);
+		void _insert_node_fixup(nodeptr np)
+		{
+			nodeptr y;
+			while (np->_parent->_color == RBTNodeColor::RED)
+			{
+				if (np->_parent == np->_parent->_parent->_left)
+				{
+					y = np->_parent->_parent->_right;
+					if (y->_color == RBTNodeColor::RED)
+					{
+						np->_parent->_color = RBTNodeColor::BLACK;
+						y->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						np = np->_parent->_parent;
+					}
+					else if (np == np->_parent->_right)
+					{
+						np = np->_parent;
+						left_rotate(np);
+					}
+					else
+					{
+						np->_parent->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						right_rotate(np->_parent->_parent);
+					}
+				}
+				else
+				{
+					y = np->_parent->_parent->_left;
+					if (y->_color == RBTNodeColor::RED)
+					{
+						np->_parent->_color = RBTNodeColor::BLACK;
+						y->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						np = np->_parent->_parent;
+					}
+					else if (np == np->_parent->_left)
+					{
+						np = np->_parent;
+						right_rotate(np);
+					}
+					else
+					{
+						np->_parent->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						left_rotate(np->_parent->_parent);
+					}
+				}
+			}
+			_root->_color = RBTNodeColor::BLACK;
+		}
+
+		static void _copy_subtree(RedBlackTree &dst, const RedBlackTree &src, nodeptr np);
 	};
 
 }

@@ -394,9 +394,12 @@ namespace lyf
 
 	
 
-	int randint(int max = RAND_MAX)
+	int randint(int max = INT_MAX)
 	{
-		return rand() % max;
+		static std::random_device rd;
+		static std::mt19937 gen(rd());
+		static std::uniform_int_distribution<int> rnd;
+		return rnd(gen) % max;
 	}
 
 	string randstring(size_t min_len = 1, size_t max_len = 40)
@@ -627,7 +630,6 @@ namespace lyf
 		using nodeptr = Node * ;
 #endif
 
-	protected:
 		static nodeptr _new_node(Node *pNode)
 		{
 #if DEBUG
