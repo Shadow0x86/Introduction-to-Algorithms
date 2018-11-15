@@ -48,19 +48,21 @@ namespace lyf
 		nodeptr _left = nullptr;
 		nodeptr _right = nullptr;
 
-		void reset_neighbors()
+		void _reset_neighbors()
 		{
 			_parent = _left = _right = nullptr;
 		}
 
-		void set_neighbors(nodeptr np)
+		void _set_neighbors(nodeptr np)
 		{
 			_parent = _left = _right = np;
 		}
 
 		using _MyBase::_MyBase;
 
-		_BaseBSTNode() {}
+		_BaseBSTNode()
+		{
+		}
 
 		_BaseBSTNode(nodeptr np)
 			: _parent(np), _left(np), _right(np)
@@ -90,7 +92,7 @@ namespace lyf
 		inline static nodeptr const _pNullNode = nullptr;
 		unsigned char _same_flag = 0;
 
-		void reverse_flag()
+		void _reverse_flag()
 		{
 			_same_flag = 1 - _same_flag;
 		}
@@ -103,7 +105,7 @@ namespace lyf
 		}
 
 		BSTNode(const BSTNode &rhs)
-			: _MyBase(rhs), _same_flag()
+			: _MyBase(rhs), _same_flag(rhs._same_flag)
 		{
 		}
 	};
@@ -124,10 +126,35 @@ namespace lyf
 		{
 		}
 
+		_BaseBinarySearchTree(_BaseBinarySearchTree &&rhs)
+			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
+		{
+			rhs._root = Node::_pNullNode;
+			rhs._size = 0;
+		}
+
+		_BaseBinarySearchTree &operator=(_BaseBinarySearchTree &&rhs)
+		{
+			if (this != &rhs)
+			{
+				this->_destroy_subtree();
+				_root = std::move(rhs._root);
+				_size = rhs._size;
+				rhs._root = Node::_pNullNode;
+				rhs._size = 0;
+			}
+			return *this;
+		}
+
+		~_BaseBinarySearchTree()
+		{
+			_destroy_subtree();
+		}
+
+	public:
 		_BaseBinarySearchTree(const _BaseBinarySearchTree &) = delete;
 		_BaseBinarySearchTree &operator=(const _BaseBinarySearchTree &) = delete;
 
-	public:
 		size_t size() const
 		{
 			return _size;
@@ -136,6 +163,11 @@ namespace lyf
 		bool empty() const
 		{
 			return size() == 0;
+		}
+
+		void clear()
+		{
+			_destroy_subtree();
 		}
 
 		nodeptr root() const
@@ -233,12 +265,41 @@ namespace lyf
 
 		static void _set_neighbors_null(nodeptr np)
 		{
-			np->set_neighbors(Node::_pNullNode);
+			np->_set_neighbors(Node::_pNullNode);
 		}
 
 		static nodeptr _conv_null_np(nodeptr np)
 		{
 			return np == Node::_pNullNode ? nullptr : np;
+		}
+
+		void _destroy_subtree_recursive(nodeptr np)
+		{
+			nodeptr right;
+			while (np != Node::_pNullNode)
+			{
+				_destroy_subtree_recursive(np->_left);
+				right = np->_right;
+				this->_delete_node(np);
+				_size--;
+				np = right;
+			}
+		}
+
+		void _destroy_subtree(nodeptr np = nullptr)
+		{
+			if (!np || np == Node::_pNullNode)
+				np = _root;
+			if (np != Node::_pNullNode && np->_parent != Node::_pNullNode)
+			{
+				if (np->_parent->_left == np)
+					np->_parent->_left = Node::_pNullNode;
+				else
+					np->_parent->_right = Node::_pNullNode;
+			}
+			else
+				_root = Node::_pNullNode;
+			_destroy_subtree_recursive(np);
 		}
 	};
 
@@ -249,11 +310,13 @@ namespace lyf
 	public:
 		using value_type = Valt;
 		using Node = BSTNode<Valt, BaseNode>;
-		using _MyBase = _BaseBinarySearchTree<Valt, BSTNode<Valt, BaseNode>>;
-		using check_t = _CheckedNodeContainer<Node>;
+		using _MyBase = _BaseBinarySearchTree<Valt, Node>;
+		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
 
 	public:
+		using _MyBase::_MyBase;
+
 		BinarySearchTree()
 			: _MyBase()
 		{
@@ -279,13 +342,6 @@ namespace lyf
 			this->_copy_subtree(*this, rhs, rhs._root);
 		}
 
-		BinarySearchTree(BinarySearchTree &&rhs)
-			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
-		{
-			rhs._root = Node::_pNullNode;
-			rhs._size = 0;
-		}
-
 		BinarySearchTree &operator=(const BinarySearchTree &rhs)
 		{
 			if (this != &rhs)
@@ -294,24 +350,6 @@ namespace lyf
 				this->_copy_subtree(*this, rhs, rhs._root);
 			}
 			return *this;
-		}
-
-		BinarySearchTree &operator=(BinarySearchTree &&rhs)
-		{
-			if (this != &rhs)
-			{
-				this->_destroy_subtree();
-				_root = std::move(rhs._root);
-				_size = rhs._size;
-				rhs._root = Node::_pNullNode;
-				rhs._size = 0;
-			}
-			return *this;
-		}
-
-		~BinarySearchTree()
-		{
-			this->_destroy_subtree();
 		}
 
 		// A copy of the subtree rooted at the given node
@@ -385,11 +423,6 @@ namespace lyf
 			return true;
 		}
 
-		void clear()
-		{
-			_destroy_subtree();
-		}
-
 		// left-rotation, preserving the binary-search-tree property
 		// if the right child of the given node is null, do nothing
 		void left_rotate(nodeptr np)
@@ -450,7 +483,7 @@ namespace lyf
 					x = x->_left;
 				else
 				{
-					x->reverse_flag();
+					x->_reverse_flag();
 					x = x->_same_flag ? x->_left : x->_right;
 				}
 			}
@@ -512,34 +545,6 @@ namespace lyf
 			_copy_subtree_recursive(dst._root, np, dst._size);
 		}
 
-		void _destroy_subtree_recursive(nodeptr np)
-		{
-			nodeptr right;
-			while (np != Node::_pNullNode)
-			{
-				_destroy_subtree_recursive(np->_left);
-				right = np->_right;
-				this->_delete_node(np);
-				_size--;
-				np = right;
-			}
-		}
-
-		void _destroy_subtree(nodeptr np = nullptr)
-		{
-			if (!np || np == Node::_pNullNode)
-				np = _root;
-			if (np != Node::_pNullNode && np->_parent != Node::_pNullNode)
-			{
-				if (np->_parent->_left == np)
-					np->_parent->_left = Node::_pNullNode;
-				else
-					np->_parent->_right = Node::_pNullNode;
-			}
-			else
-				_root = Node::_pNullNode;
-			_destroy_subtree_recursive(np);
-		}
 	};
 
 
@@ -554,10 +559,12 @@ namespace lyf
 		typename _CheckedNodeContainer<RBTNode<Valt, Base>>::nodeptr>
 	{
 		friend class _CheckedNodeContainer<RBTNode>;
+		friend class _BaseBinarySearchTree<Valt, RBTNode>;
 		friend class RedBlackTree<Valt, Base>;
 
 	public:
-		using nodeptr = typename _CheckedNodeContainer<RBTNode>::nodeptr;
+		using check_t = _CheckedNodeContainer<RBTNode>;
+		using nodeptr = typename check_t::nodeptr;
 		using _MyBase = _BaseBSTNode<Valt, Base, nodeptr>;
 
 		RBTNodeColor color() const
@@ -567,39 +574,40 @@ namespace lyf
 		}
 
 	private:
+		inline static nodeptr const _pNullNode = check_t::_new_node(new RBTNode(RBTNodeColor::BLACK));
 		RBTNodeColor _color = RBTNodeColor::BLACK;
-
-		void _set_neighbors(nodeptr np)
-		{
-			_parent = _left = _right = np;
-		}
 
 		using _MyBase::_MyBase;
 
 		RBTNode()
-			: _MyBase(), _color(RBTNodeColor::BLACK)
+			: _MyBase(_pNullNode), _color(RBTNodeColor::RED)
+		{
+		}
+
+		RBTNode(RBTNodeColor color)
+			: _MyBase(_pNullNode), _color(color)
 		{
 		}
 
 		RBTNode(const RBTNode &rhs)
-			: _MyBase(rhs), _color()
+			: _MyBase(rhs), _color(rhs._color)
 		{
 		}
 	};
 
 	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
-	class RedBlackTree : public _CheckedNodeContainer<RBTNode<Valt, BaseNode>>
+	class RedBlackTree : public _BaseBinarySearchTree<Valt, RBTNode<Valt, BaseNode>>
 	{
 	public:
 		using value_type = Valt;
 		using Node = RBTNode<Valt, BaseNode>;
-		using _MyBase = _CheckedNodeContainer<Node>;
-		using check_t = _CheckedNodeContainer<Node>;
+		using _MyBase = _BaseBinarySearchTree<Valt, Node>;
+		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
 
 	public:
 		RedBlackTree()
-			: _MyBase(), _root(_pNullNode), _size()
+			: _MyBase(), _root(Node::_pNullNode), _size()
 		{
 		}
 
@@ -626,13 +634,12 @@ namespace lyf
 		RedBlackTree(RedBlackTree &&rhs)
 			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
 		{
-			rhs._root = _pNullNode;
+			rhs._root = Node::_pNullNode;
 			rhs._size = 0;
 		}
 
 		RedBlackTree &operator=(const RedBlackTree &rhs)
 		{
-			_MyBase::operator=(rhs);
 			if (this != &rhs)
 			{
 				this->clear();
@@ -643,21 +650,15 @@ namespace lyf
 
 		RedBlackTree &operator=(RedBlackTree &&rhs)
 		{
-			_MyBase::operator=(std::move(rhs));
 			if (this != &rhs)
 			{
 				this->_destroy_subtree();
 				_root = std::move(rhs._root);
 				_size = rhs._size;
-				rhs._root = _pNullNode;
+				rhs._root = Node::_pNullNode;
 				rhs._size = 0;
 			}
 			return *this;
-		}
-
-		~RedBlackTree()
-		{
-			this->_destroy_subtree();
 		}
 
 		// A copy of the subtree rooted at the given node
@@ -666,16 +667,6 @@ namespace lyf
 			RedBlackTree ret;
 			this->_copy_subtree(ret, *this, np);
 			return ret;
-		}
-
-		size_t size() const
-		{
-			return _size;
-		}
-
-		bool empty() const
-		{
-			return size() == 0;
 		}
 
 		void insert(const value_type &value)
@@ -694,105 +685,16 @@ namespace lyf
 			this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		nodeptr root() const
-		{
-			return this->_conv_null_np(_root);
-		}
-
-		nodeptr search(const value_type &value) const
-		{
-			nodeptr np = _root;
-			while (np != _pNullNode)
-			{
-				if (np->value() == value)
-					break;
-				else if (np->value() < value)
-					np = np->_right;
-				else
-					np = np->_left;
-			}
-			return this->_conv_null_np(np);
-		}
-
-		// The node of maximum value in subtree which rooted at the given node(default root)
-		nodeptr max_node(nodeptr np = nullptr) const
-		{
-			if (!np || np == _pNullNode)
-				np = _root;
-			if (np != _pNullNode)
-			{
-				this->_ensureInTree(np);
-				while (np->_right != _pNullNode)
-					np = np->_right;
-			}
-			return this->_conv_null_np(np);
-		}
-
-		// The maximum value in subtree which rooted at the given node(default root)
-		value_type max_value(nodeptr np = nullptr) const
-		{
-			return this->max_node(np)->value();
-		}
-
-		// The node of minimum value in subtree which rooted at the given node(default root)
-		nodeptr min_node(nodeptr np = nullptr) const
-		{
-			if (!np || np == _pNullNode)
-				np = _root;
-			if (np != _pNullNode)
-			{
-				this->_ensureInTree(np);
-				while (np->_left != _pNullNode)
-					np = np->_left;
-			}
-			return this->_conv_null_np(np);
-		}
-
-		// The minimum value in subtree which rooted at the given node(default root)
-		value_type min_value(nodeptr np = nullptr) const
-		{
-			return this->min_node(np)->value();
-		}
-
-		// The node with the smallest key greater than the key of the given node
-		nodeptr successor(nodeptr np) const
-		{
-			this->_ensureInTree(np);
-			if (np->_right != _pNullNode)
-				return this->min_node(np->_right);
-			nodeptr p;
-			while ((p = np->_parent) != _pNullNode && p->_left != np)
-				np = p;
-			return this->_conv_null_np(p);
-		}
-
-		// The node with the largest key less than the key of the given node
-		nodeptr predecessor(nodeptr np) const
-		{
-			this->_ensureInTree(np);
-			if (np->_left != _pNullNode)
-				return this->max_node(np->_left);
-			nodeptr p;
-			while ((p = np->_parent) != _pNullNode && p->_right != np)
-				np = p;
-			return this->_conv_null_np(p);
-		}
-
 		void remove(nodeptr np);
 
 		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
 		{
 			nodeptr np = this->search(value);
-			if (!np || np == _pNullNode)
+			if (!np || np == Node::_pNullNode)
 				return false;
 			this->remove(np);
 			return true;
-		}
-
-		void clear()
-		{
-			_destroy_subtree();
 		}
 
 		// left-rotation, preserving the binary-search-tree property
@@ -801,12 +703,12 @@ namespace lyf
 		{
 			this->_ensureInTree(np);
 			nodeptr right = np->_right;
-			if (right == _pNullNode)
+			if (right == Node::_pNullNode)
 				return;
 			np->_right = right->_left;
-			if (right->_left != _pNullNode)
+			if (right->_left != Node::_pNullNode)
 				right->_left->_parent = np;
-			if (np->_parent == _pNullNode)
+			if (np->_parent == Node::_pNullNode)
 				_root = right;
 			else if (np == np->_parent->_left)
 				np->_parent->_left = right;
@@ -823,12 +725,12 @@ namespace lyf
 		{
 			this->_ensureInTree(np);
 			nodeptr left = np->_left;
-			if (left == _pNullNode)
+			if (left == Node::_pNullNode)
 				return;
 			np->_left = left->_right;
-			if (left->_right != _pNullNode)
+			if (left->_right != Node::_pNullNode)
 				left->_right->_parent = np;
-			if (np->_parent == _pNullNode)
+			if (np->_parent == Node::_pNullNode)
 				_root = left;
 			else if (np == np->_parent->_right)
 				np->_parent->_right = left;
@@ -840,31 +742,8 @@ namespace lyf
 		}
 
 	private:
-		nodeptr _root = _pNullNode;
-		size_t _size = 0;
-
-		static nodeptr const _pNullNode;
-
-		static void _set_null_neighbors(nodeptr np)
-		{
-			np->_set_neighbors(_pNullNode);
-		}
-
-		static nodeptr _conv_null_np(nodeptr np)
-		{
-			return np == _pNullNode ? nullptr : np;
-		}
-
-		void _ensureInTree(const nodeptr &np) const
-		{
-			np->_ensureInCont(this);
-		}
 
 		void _insert_node(Node *pNode);
 	};
 
-	template<typename Valt, typename BaseNode>
-	typename RedBlackTree<Valt, BaseNode>::nodeptr const 
-		RedBlackTree<Valt, BaseNode>::_pNullNode = typename RedBlackTree<Valt, BaseNode>::check_t::_new_node(
-			new RedBlackTree<Valt, BaseNode>::Node);
 }

@@ -649,7 +649,7 @@ namespace lyf
 		static void _delete_node(nodeptr &np)
 		{
 #if DEBUG
-			np->reset_neighbors();
+			np->_reset_neighbors();
 			np->_setCont();
 			np.reset();
 #else
