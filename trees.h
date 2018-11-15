@@ -558,7 +558,7 @@ namespace lyf
 		}
 
 		RBTNode(RBTNodeColor color)
-			: _MyBase(_pNullNode), _color(color)
+			: _MyBase(), _color(color)
 		{
 		}
 
@@ -670,9 +670,12 @@ namespace lyf
 			return true;
 		}
 
+		
+
+	private:
 		// left-rotation, preserving the binary-search-tree property
 		// if the right child of the given node is null, do nothing
-		void left_rotate(nodeptr np)
+		void _left_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr right = np->_right;
@@ -694,7 +697,7 @@ namespace lyf
 
 		// right-rotation, preserving the binary-search-tree property
 		// if the left child of the given node is null, do nothing
-		void right_rotate(nodeptr np)
+		void _right_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr left = np->_left;
@@ -714,7 +717,6 @@ namespace lyf
 			np->_parent = left;
 		}
 
-	private:
 		void _insert_node(Node *pNode)
 		{
 			nodeptr np = check_t::_new_node(pNode);
@@ -757,16 +759,16 @@ namespace lyf
 						np->_parent->_parent->_color = RBTNodeColor::RED;
 						np = np->_parent->_parent;
 					}
-					else if (np == np->_parent->_right)
-					{
-						np = np->_parent;
-						left_rotate(np);
-					}
 					else
 					{
+						if (np == np->_parent->_right)
+						{
+							np = np->_parent;
+							_left_rotate(np);
+						}
 						np->_parent->_color = RBTNodeColor::BLACK;
 						np->_parent->_parent->_color = RBTNodeColor::RED;
-						right_rotate(np->_parent->_parent);
+						_right_rotate(np->_parent->_parent);
 					}
 				}
 				else
@@ -779,16 +781,16 @@ namespace lyf
 						np->_parent->_parent->_color = RBTNodeColor::RED;
 						np = np->_parent->_parent;
 					}
-					else if (np == np->_parent->_left)
-					{
-						np = np->_parent;
-						right_rotate(np);
-					}
 					else
 					{
+						if (np == np->_parent->_left)
+						{
+							np = np->_parent;
+							_right_rotate(np);
+						}
 						np->_parent->_color = RBTNodeColor::BLACK;
 						np->_parent->_parent->_color = RBTNodeColor::RED;
-						left_rotate(np->_parent->_parent);
+						_left_rotate(np->_parent->_parent);
 					}
 				}
 			}
