@@ -363,7 +363,6 @@ namespace lyf
 		{
 			if (this != &rhs)
 			{
-				this->clear();
 				this->_copy_subtree(*this, rhs, rhs._root);
 			}
 			return *this;
@@ -397,7 +396,7 @@ namespace lyf
 		{
 			this->_ensureInTree(np);
 			nodeptr new_np;
-			if (np->_left == Node::_pNullNode && np->_right == Node::_pNullNode)
+			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
 			{
 				new_np = np->_left != Node::_pNullNode ? np->_left : np->_right;
 			}
@@ -407,7 +406,8 @@ namespace lyf
 				if (new_np != np->_right)
 				{
 					new_np->_parent->_left = new_np->_right;
-					new_np->_right->_parent = new_np->_parent;
+					if (new_np->_right != Node::_pNullNode)
+						new_np->_right->_parent = new_np->_parent;
 					new_np->_right = np->_right;
 					np->_right->_parent = new_np;
 				}
@@ -601,7 +601,7 @@ namespace lyf
 		RedBlackTree(const RedBlackTree &rhs)
 			: RedBlackTree()
 		{
-			this->_copy_subtree(*this, rhs, rhs._root);
+			this->_copy_tree(*this, rhs);
 		}
 
 		RedBlackTree(RedBlackTree &&rhs)
@@ -615,8 +615,7 @@ namespace lyf
 		{
 			if (this != &rhs)
 			{
-				this->clear();
-				this->_copy_subtree(*this, rhs, rhs._root);
+				this->_copy_tree(*this, rhs);
 			}
 			return *this;
 		}
@@ -633,14 +632,6 @@ namespace lyf
 			}
 			return *this;
 		}
-
-		// A copy of the subtree rooted at the given node
-		//RedBlackTree subtree(nodeptr np)
-		//{
-		//	RedBlackTree ret;
-		//	this->_copy_subtree(ret, *this, np);
-		//	return ret;
-		//}
 
 		void insert(const value_type &value)
 		{
@@ -669,8 +660,6 @@ namespace lyf
 			this->remove(np);
 			return true;
 		}
-
-		
 
 	private:
 		// left-rotation, preserving the binary-search-tree property
@@ -797,7 +786,7 @@ namespace lyf
 			_root->_color = RBTNodeColor::BLACK;
 		}
 
-		static void _copy_subtree(RedBlackTree &dst, const RedBlackTree &src, nodeptr np);
+		static void _copy_tree(RedBlackTree &dst, const RedBlackTree &src);
 	};
 
 }
