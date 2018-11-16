@@ -649,7 +649,43 @@ namespace lyf
 			this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
 		}
 
-		void remove(nodeptr np);
+		void remove(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			nodeptr new_np, x;
+			RBTNodeColor color = np->_color;
+			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
+			{
+				new_np = np->_left == Node::_pNullNode ? np->_right : np->_left;
+			}
+			else
+			{
+				new_np = this->min_node(np->_right);
+				color = new_np->_color;
+			}
+			if (new_np != np->_right && new_np != np->_left)
+			{
+				x = new_np->_right;
+				x->_parent = new_np->_parent;
+				new_np->_parent->_left = x;
+				new_np->_color = np->_color;
+			}
+			else
+			{
+				x = new_np;
+			}
+			new_np->_parent = np->_parent;
+			if (np->_parent == Node::_pNullNode)
+				_root = new_np;
+			else if (np == np->_parent->_left)
+				np->_parent->_left = new_np;
+			else
+				np->_parent->_right = new_np;
+
+			this->_delete_node(np);
+			if (color == RBTNodeColor::BLACK)
+				this->_remove_fixup(x);
+		}
 
 		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
@@ -816,6 +852,8 @@ namespace lyf
 			}
 			_root->_color = RBTNodeColor::BLACK;
 		}
+
+		void _remove_fixup(nodeptr np);
 
 		static void _copy_tree(RedBlackTree &dst, const RedBlackTree &src);
 	};
