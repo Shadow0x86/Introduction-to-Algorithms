@@ -661,7 +661,38 @@ namespace lyf
 			return true;
 		}
 
+		// check the red-black tree property, returns black-height
+		// if the property is false, returns -1
+		int check_property() const
+		{
+			if (_root->_color != RBTNodeColor::BLACK)
+				return -1;
+			if (_root == Node::_pNullNode)
+				return 0;
+			int lh = this->_check_property_recursive(_root->_left, 0);
+			int rh = this->_check_property_recursive(_root->_right, 0);
+			return (lh != rh || lh == -1 || rh == -1) ? -1 : lh;
+		}
+
 	private:
+		int _check_property_recursive(nodeptr np, int h) const
+		{
+			if (np == Node::_pNullNode)
+				return h + 1;
+			if (np->_color == RBTNodeColor::RED)
+			{
+				if (np->_left->_color == RBTNodeColor::RED || np->_right->_color == RBTNodeColor::RED)
+					return -1;
+			}
+			else if (np->_color == RBTNodeColor::BLACK)
+				h++;
+			else
+				return -1;
+			int lh = this->_check_property_recursive(np->_left, h);
+			int rh = this->_check_property_recursive(np->_right, h);
+			return (lh != rh || lh == -1 || rh == -1) ? -1 : lh;
+		}
+
 		// left-rotation, preserving the binary-search-tree property
 		// if the right child of the given node is null, do nothing
 		void _left_rotate(nodeptr np)
