@@ -657,22 +657,25 @@ namespace lyf
 			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
 			{
 				new_np = np->_left == Node::_pNullNode ? np->_right : np->_left;
+				x = new_np;
 			}
 			else
 			{
 				new_np = this->min_node(np->_right);
 				color = new_np->_color;
-			}
-			if (new_np != np->_right && new_np != np->_left)
-			{
 				x = new_np->_right;
-				x->_parent = new_np->_parent;
-				new_np->_parent->_left = x;
+				if (new_np != np->_right)
+				{
+					x->_parent = new_np->_parent;
+					new_np->_parent->_left = x;
+					new_np->_right = np->_right;
+					np->_right->_parent = new_np;
+				}
+				else
+					x->_parent = new_np;
+				new_np->_left = np->_left;
+				np->_left->_parent = new_np;
 				new_np->_color = np->_color;
-			}
-			else
-			{
-				x = new_np;
 			}
 			new_np->_parent = np->_parent;
 			if (np->_parent == Node::_pNullNode)
@@ -683,6 +686,7 @@ namespace lyf
 				np->_parent->_right = new_np;
 
 			this->_delete_node(np);
+			_size--;
 			if (color == RBTNodeColor::BLACK)
 				this->_remove_fixup(x);
 		}
