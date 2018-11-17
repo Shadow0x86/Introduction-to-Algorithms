@@ -857,7 +857,76 @@ namespace lyf
 			_root->_color = RBTNodeColor::BLACK;
 		}
 
-		void _remove_fixup(nodeptr np);
+		void _remove_fixup(nodeptr np)
+		{
+			nodeptr w;
+			while (np != _root && np->_color == RBTNodeColor::BLACK)
+			{
+				if (np == np->_parent->_left)
+				{
+					w = np->_parent->_right;
+					if (w->_color == RBTNodeColor::RED)
+					{
+						w->_color = RBTNodeColor::BLACK;
+						np->_parent->_color = RBTNodeColor::RED;
+						_left_rotate(np->_parent);
+						w = np->_parent->_right;
+					}
+					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
+					{
+						w->_color = RBTNodeColor::RED;
+						np = np->_parent;
+					}
+					else
+					{
+						if (w->_right->_color == RBTNodeColor::BLACK)
+						{
+							w->_color = RBTNodeColor::RED;
+							w->_left->_color = RBTNodeColor::BLACK;
+							_right_rotate(w);
+							w = w->_parent;
+						}
+						w->_color = np->_parent->_color;
+						np->_parent->_color = RBTNodeColor::BLACK;
+						w->_right->_color = RBTNodeColor::BLACK;
+						_left_rotate(np->_parent);
+						np = _root;
+					}
+				}
+				else
+				{
+					w = np->_parent->_left;
+					if (w->_color == RBTNodeColor::RED)
+					{
+						w->_color = RBTNodeColor::BLACK;
+						np->_parent->_color = RBTNodeColor::RED;
+						_right_rotate(np->_parent);
+						w = np->_parent->_left;
+					}
+					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
+					{
+						w->_color = RBTNodeColor::RED;
+						np = np->_parent;
+					}
+					else
+					{
+						if (w->_left->_color == RBTNodeColor::BLACK)
+						{
+							w->_color = RBTNodeColor::RED;
+							w->_right->_color = RBTNodeColor::BLACK;
+							_left_rotate(w);
+							w = w->_parent;
+						}
+						w->_color = np->_parent->_color;
+						np->_parent->_color = RBTNodeColor::BLACK;
+						w->_left->_color = RBTNodeColor::BLACK;
+						_right_rotate(np->_parent);
+						np = _root;
+					}
+				}
+			}
+			np->_color = RBTNodeColor::BLACK;
+		}
 
 		static void _copy_tree(RedBlackTree &dst, const RedBlackTree &src);
 	};
