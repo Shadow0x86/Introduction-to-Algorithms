@@ -9,7 +9,7 @@ namespace lyf
 	template<typename Valt, typename Node>
 	class _BaseBinarySearchTree;
 
-	template<typename Valt, typename BaseNode>
+	template<typename Valt>
 	class BinarySearchTree;
 
 	template<typename Valt, typename Base, typename nodeptr>
@@ -99,7 +99,7 @@ namespace lyf
 	{
 		friend class _CheckedNodeContainer<BSTNode>;
 		friend class _BaseBinarySearchTree<Valt, BSTNode>;
-		friend class BinarySearchTree<Valt, Base>;
+		friend class BinarySearchTree<Valt>;
 
 	public:
 		using nodeptr = typename _CheckedNodeContainer<BSTNode<Valt, Base>>::nodeptr;
@@ -318,15 +318,56 @@ namespace lyf
 				_root = Node::_pNullNode;
 			_destroy_subtree_recursive(np);
 		}
+
+		static void _copy_subtree_recursive(nodeptr dst_np, nodeptr src_np, size_t &size)
+		{
+			while (src_np != Node::_pNullNode)
+			{
+				if (src_np->_left != Node::_pNullNode)
+				{
+					dst_np->_left = check_t::_new_node(new Node(*(src_np->_left)));
+					dst_np->_left->_parent = dst_np;
+					dst_np->_left->_setCont(&dst_np);
+					size++;
+				}
+				if (src_np->_right != Node::_pNullNode)
+				{
+					dst_np->_right = check_t::_new_node(new Node(*(src_np->_right)));
+					dst_np->_right->_parent = dst_np;
+					dst_np->_right->_setCont(&dst_np);
+					size++;
+				}
+				_copy_subtree_recursive(dst_np->_left, src_np->_left, size);
+				dst_np = dst_np->_right;
+				src_np = src_np->_right;
+			}
+		}
+
+		static void _copy_subtree(_BaseBinarySearchTree &dst, const _BaseBinarySearchTree &src, nodeptr np)
+		{
+			if (!np || np == Node::_pNullNode)
+				throw std::runtime_error("Subtree's root can't be null");
+			src._ensureInTree(np);
+			dst._destroy_subtree();
+			nodeptr curr;
+			if (np != Node::_pNullNode)
+			{
+				curr = check_t::_new_node(new Node(*np));
+				dst._root = curr;
+				curr->_setCont(&dst);
+				dst._size++;
+			}
+			_copy_subtree_recursive(dst._root, np, dst._size);
+		}
 	};
 
 
-	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
-	class BinarySearchTree : public _BaseBinarySearchTree<Valt, BSTNode<Valt, BaseNode>>
+	template<typename Valt>
+	class BinarySearchTree : public _BaseBinarySearchTree<Valt, BSTNode<Valt, UniqueNode<Valt>>>
 	{
 	public:
 		using value_type = Valt;
-		using Node = BSTNode<Valt, BaseNode>;
+		using Node = BSTNode<Valt, UniqueNode<Valt>>;
 		using _MyBase = _BaseBinarySearchTree<Valt, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
@@ -477,51 +518,10 @@ namespace lyf
 			_size++;
 		}
 
-		static void _copy_subtree_recursive(nodeptr dst_np, nodeptr src_np, size_t &size)
-		{
-			while (src_np != Node::_pNullNode)
-			{
-				if (src_np->_left != Node::_pNullNode)
-				{
-					dst_np->_left = check_t::_new_node(new Node(*(src_np->_left)));
-					dst_np->_left->_parent = dst_np;
-					dst_np->_left->_setCont(&dst_np);
-					size++;
-				}
-				if (src_np->_right != Node::_pNullNode)
-				{
-					dst_np->_right = check_t::_new_node(new Node(*(src_np->_right)));
-					dst_np->_right->_parent = dst_np;
-					dst_np->_right->_setCont(&dst_np);
-					size++;
-				}
-				_copy_subtree_recursive(dst_np->_left, src_np->_left, size);
-				dst_np = dst_np->_right;
-				src_np = src_np->_right;
-			}
-		}
-
-		static void _copy_subtree(BinarySearchTree &dst, const BinarySearchTree &src, nodeptr np)
-		{
-			if (!np || np == Node::_pNullNode)
-				throw std::runtime_error("Subtree's root can't be null");
-			src._ensureInTree(np);
-			dst._destroy_subtree();
-			nodeptr curr;
-			if (np != Node::_pNullNode)
-			{
-				curr = check_t::_new_node(new Node(*np));
-				dst._root = curr;
-				curr->_setCont(&dst);
-				dst._size++;
-			}
-			_copy_subtree_recursive(dst._root, np, dst._size);
-		}
-
 	};
 
 
-	template<typename Valt, typename BaseNode>
+	template<typename Valt>
 	class RedBlackTree;
 
 	enum class RBTNodeColor { RED, BLACK };
@@ -533,7 +533,7 @@ namespace lyf
 	{
 		friend class _CheckedNodeContainer<RBTNode>;
 		friend class _BaseBinarySearchTree<Valt, RBTNode>;
-		friend class RedBlackTree<Valt, Base>;
+		friend class RedBlackTree<Valt>;
 
 	public:
 		using check_t = _CheckedNodeContainer<RBTNode>;
@@ -565,15 +565,16 @@ namespace lyf
 		RBTNode(const RBTNode &rhs)
 			: _MyBase(rhs), _color(rhs._color)
 		{
+			_parent = _left = _right = _pNullNode;
 		}
 	};
 
-	template<typename Valt, typename BaseNode = UniqueNode<Valt>>
-	class RedBlackTree : public _BaseBinarySearchTree<Valt, RBTNode<Valt, BaseNode>>
+	template<typename Valt>
+	class RedBlackTree : public _BaseBinarySearchTree<Valt, RBTNode<Valt, UniqueNode<Valt>>>
 	{
 	public:
 		using value_type = Valt;
-		using Node = RBTNode<Valt, BaseNode>;
+		using Node = RBTNode<Valt, UniqueNode<Valt>>;
 		using _MyBase = _BaseBinarySearchTree<Valt, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
@@ -601,36 +602,24 @@ namespace lyf
 		RedBlackTree(const RedBlackTree &rhs)
 			: RedBlackTree()
 		{
-			this->_copy_tree(*this, rhs);
-		}
-
-		RedBlackTree(RedBlackTree &&rhs)
-			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
-		{
-			rhs._root = Node::_pNullNode;
-			rhs._size = 0;
+			this->_copy_subtree(*this, rhs, rhs._root);
 		}
 
 		RedBlackTree &operator=(const RedBlackTree &rhs)
 		{
 			if (this != &rhs)
 			{
-				this->_copy_tree(*this, rhs);
+				this->_copy_subtree(*this, rhs, rhs._root);
 			}
 			return *this;
 		}
 
-		RedBlackTree &operator=(RedBlackTree &&rhs)
+		// A copy of the subtree rooted at the given node
+		RedBlackTree subtree(nodeptr np)
 		{
-			if (this != &rhs)
-			{
-				this->_destroy_subtree();
-				_root = std::move(rhs._root);
-				_size = rhs._size;
-				rhs._root = Node::_pNullNode;
-				rhs._size = 0;
-			}
-			return *this;
+			RedBlackTree ret;
+			this->_copy_subtree(ret, *this, np);
+			return ret;
 		}
 
 		void insert(const value_type &value)
@@ -928,7 +917,12 @@ namespace lyf
 			np->_color = RBTNodeColor::BLACK;
 		}
 
-		static void _copy_tree(RedBlackTree &dst, const RedBlackTree &src);
+		static void _copy_subtree(RedBlackTree &dst, const RedBlackTree &src, nodeptr np)
+		{
+			_MyBase::_copy_subtree(dst, src, np);
+			dst._root->_color = RBTNodeColor::BLACK;
+		}
+
 	};
 
 }
