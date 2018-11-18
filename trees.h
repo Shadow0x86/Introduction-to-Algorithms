@@ -271,6 +271,16 @@ namespace lyf
 			return this->_conv_null_np(p);
 		}
 
+		// The in-order traversal of the tree,
+		// calling the provided function with the value of each node
+		template<typename Func>
+		void in_order_traversal(Func func, nodeptr np = nullptr)
+		{
+			if (!np)
+				np = _root;
+			this->_in_order_traversal_recursive(func, np);
+		}
+
 	protected:
 		nodeptr _root = Node::_pNullNode;
 		size_t _size = 0;
@@ -359,6 +369,18 @@ namespace lyf
 			}
 			_copy_subtree_recursive(dst._root, np, dst._size);
 		}
+
+		template<typename Func>
+		void _in_order_traversal_recursive(Func func, nodeptr np)
+		{
+			while (np != Node::_pNullNode)
+			{
+				_in_order_traversal_recursive(func, np->_left);
+				func(np->value());
+				np = np->_right;
+			}
+		}
+
 	};
 
 
