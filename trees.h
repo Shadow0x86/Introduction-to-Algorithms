@@ -543,7 +543,7 @@ namespace lyf
 	};
 
 
-	template<typename Valt>
+	template<typename Valt, typename Node>
 	class RedBlackTree;
 
 	enum class RBTNodeColor { RED, BLACK };
@@ -555,7 +555,7 @@ namespace lyf
 	{
 		friend class _CheckedNodeContainer<RBTNode>;
 		friend class _BaseBinarySearchTree<Valt, RBTNode>;
-		friend class RedBlackTree<Valt>;
+		friend class RedBlackTree<Valt, RBTNode>;
 
 	public:
 		using check_t = _CheckedNodeContainer<RBTNode>;
@@ -591,12 +591,11 @@ namespace lyf
 		}
 	};
 
-	template<typename Valt>
-	class RedBlackTree : public _BaseBinarySearchTree<Valt, RBTNode<Valt, UniqueNode<Valt>>>
+	template<typename Valt, typename Node = RBTNode<Valt, UniqueNode<Valt>>>
+	class RedBlackTree : public _BaseBinarySearchTree<Valt, Node>
 	{
 	public:
 		using value_type = Valt;
-		using Node = RBTNode<Valt, UniqueNode<Valt>>;
 		using _MyBase = _BaseBinarySearchTree<Valt, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
@@ -725,7 +724,7 @@ namespace lyf
 			return (lh != rh || lh == -1 || rh == -1) ? -1 : lh;
 		}
 
-	private:
+	protected:
 		int _check_property_recursive(nodeptr np, int h) const
 		{
 			if (np == Node::_pNullNode)
@@ -945,6 +944,114 @@ namespace lyf
 			dst._root->_color = RBTNodeColor::BLACK;
 		}
 
+	};
+
+
+	template<typename Valt, typename Node>
+	class OrderStatisticTree;
+
+	// Node class of red-black tree
+	template<typename Valt, typename Base>
+	class OSTNode : public _BaseBSTNode<Valt, Base,
+		typename _CheckedNodeContainer<OSTNode<Valt, Base>>::nodeptr>
+	{
+		friend class _CheckedNodeContainer<OSTNode>;
+		friend class _BaseBinarySearchTree<Valt, OSTNode>;
+		friend class RedBlackTree<Valt, OSTNode>;
+		friend class OrderStatisticTree<Valt, OSTNode>;
+
+	public:
+		using check_t = _CheckedNodeContainer<OSTNode>;
+		using nodeptr = typename check_t::nodeptr;
+		using _MyBase = _BaseBSTNode<Valt, Base, nodeptr>;
+
+		RBTNodeColor color() const
+		{
+			this->_ensureInCont();
+			return _color;
+		}
+
+		size_t size() const
+		{
+			this->_ensureInCont();
+			return _size;
+		}
+
+	private:
+		inline static nodeptr const _pNullNode = check_t::_new_node(new OSTNode(RBTNodeColor::BLACK, 0));
+		RBTNodeColor _color = RBTNodeColor::RED;
+		size_t _size = 1;
+
+		using _MyBase::_MyBase;
+
+		OSTNode()
+			: _MyBase(_pNullNode), _color(RBTNodeColor::RED), _size(1)
+		{
+		}
+
+		OSTNode(RBTNodeColor color, size_t size)
+			: _MyBase(), _color(color), _size(size)
+		{
+		}
+
+		OSTNode(const OSTNode &rhs)
+			: _MyBase(rhs), _color(rhs._color), _size(rhs._size)
+		{
+			_parent = _left = _right = _pNullNode;
+		}
+	};
+
+	template<typename Valt, typename Node = OSTNode<Valt, UniqueNode<Valt>>>
+	class OrderStatisticTree : public RedBlackTree<Valt, Node>
+	{
+	public:
+		using value_type = Valt;
+		using _MyBase = RedBlackTree<Valt, Node>;
+		using check_t = typename _MyBase::check_t;
+		using nodeptr = typename check_t::nodeptr;
+
+	public:
+		OrderStatisticTree()
+			: _MyBase()
+		{
+		}
+
+		OrderStatisticTree(std::initializer_list<value_type> list)
+			: OrderStatisticTree(list.begin(), list.end())
+		{
+		}
+
+		template<typename Iter>
+		OrderStatisticTree(Iter begin, Iter end)
+		{
+			for (auto it = begin; it != end; it++)
+			{
+				this->insert(*it);
+			}
+		}
+
+		OrderStatisticTree(const RedBlackTree &rhs)
+			: OrderStatisticTree()
+		{
+			this->_copy_subtree(*this, rhs, rhs._root);
+		}
+
+		OrderStatisticTree &operator=(const OrderStatisticTree &rhs)
+		{
+			if (this != &rhs)
+			{
+				this->_copy_subtree(*this, rhs, rhs._root);
+			}
+			return *this;
+		}
+
+		// A copy of the subtree rooted at the given node
+		OrderStatisticTree subtree(nodeptr np)
+		{
+			OrderStatisticTree ret;
+			this->_copy_subtree(ret, *this, np);
+			return ret;
+		}
 	};
 
 }
