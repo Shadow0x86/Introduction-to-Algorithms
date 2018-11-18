@@ -19,10 +19,10 @@ namespace lyf
 	}
 
 
-
+	// Sort range [begin, end) in O(n²) time in place stably.
 	template<typename Iter, typename Key = void*>
 	void insertion_sort(Iter begin, Iter end, Key key = nullptr)
-	{	// Sort range [begin, end) in O(n²) time in place stably.
+	{
 		if (!_isValidRange(begin, end))
 			return;
 
@@ -49,10 +49,10 @@ namespace lyf
 	}
 
 
-
+	// Sort range [begin, end) in O(nlgn) time in place stably.
 	template<typename Iter, typename Key = void*>
 	void merge_sort(Iter begin, Iter end, Key key = nullptr)
-	{	// Sort range [begin, end) in O(nlgn) time in place stably.
+	{
 		if (!_isValidRange(begin, end))
 			return;
 
@@ -109,10 +109,10 @@ namespace lyf
 	}
 
 
-
+	// Sort range [begin, end) in O(n²) time in place stably.
 	template<typename Iter, typename Key = void*>
 	void bubble_sort(Iter begin, Iter end, Key key = nullptr)
-	{	// Sort range [begin, end) in O(n²) time in place stably.
+	{
 		if (!_isValidRange(begin, end))
 			return;
 
@@ -131,19 +131,18 @@ namespace lyf
 	}
 
 
-
+	// Sort range [begin, end) in O(nlgn) time in place
 	template<typename Iter, typename Key = void*>
 	void heap_sort(Iter begin, Iter end, Key key = nullptr)
-	{	// Sort range [begin, end) in O(nlgn) time in place
+	{
 		MaxHeap<Iter, Key>::sort(begin, end, key);
 	}
 
 
-
+	// Sort range [begin, end) in O(nlgn) time in place
 	template<typename Iter, typename Key = void*>
 	void quick_sort(Iter begin, Iter end, Key key = nullptr)
-	{	// Sort range [begin, end) in O(nlgn) time in place
-
+	{
 		using diff_t = typename Iter_traits<Iter>::difference_type;
 		diff_t num;
 		while ((num = end - begin) > 1)
@@ -248,10 +247,10 @@ namespace lyf
 	}
 
 
-
+	// Sort range [begin, end) in O(nlgn) time stably. The key should map [begin, end) to [0, limit).
 	template<typename Iter, typename KeyResult, typename OutIter, typename Key = void*>
 	void counting_sort(Iter begin, Iter end, KeyResult limit, OutIter out, Key key = nullptr)
-	{	// Sort range [begin, end) in O(nlgn) time stably. The key should map [begin, end) to [0, limit).
+	{
 		using K = _Predicate<Key, typename Iter_traits<Iter>::value_type>;
 
 		if (end - begin <= 1)
@@ -280,11 +279,10 @@ namespace lyf
 	}
 
 
-
+	// return the iterators or pointers to the minimum and maximum value in range [begin, end).
 	template<typename Iter, typename Key = void*>
 	std::pair<Iter, Iter> minmax_iter(Iter begin, Iter end, Key key = nullptr)
-	{	// return the iterators or pointers to the minimum and maximum value in range [begin, end).
-
+	{
 		_ensureValidRange(begin, end);
 
 		Iter maxit, minit, it1, it2;
@@ -321,9 +319,10 @@ namespace lyf
 		return std::pair<Iter, Iter>(minit, maxit);
 	}
 
+	// return the minimum and maximum value in range [begin, end).
 	template<typename Iter, typename Key = void*>
 	auto minmax(Iter begin, Iter end, Key key = nullptr)
-	{	// return the minimum and maximum value in range [begin, end).
+	{
 		auto its = minmax_iter(begin, end, key);
 		return std::make_pair(*its.first, *its.second);
 	}
