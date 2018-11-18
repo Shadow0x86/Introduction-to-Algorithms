@@ -129,7 +129,7 @@ namespace lyf
 
 
 	template<typename Valt, typename Node>
-	class _BaseBinarySearchTree : public _CheckedNodeContainer<Node>
+	class _BaseBinarySearchTree
 	{
 	public:
 		using value_type = Valt;
@@ -307,7 +307,7 @@ namespace lyf
 			{
 				_destroy_subtree_recursive(np->_left);
 				right = np->_right;
-				this->_delete_node(np);
+				check_t::_delete_node(np);
 				_size--;
 				np = right;
 			}
@@ -439,20 +439,20 @@ namespace lyf
 			return ret;
 		}
 
-		void insert(const value_type &value)
+		nodeptr insert(const value_type &value)
 		{
-			this->_insert_node(new Node(Node::_pNullNode, this, value));
+			return this->_insert_node(new Node(Node::_pNullNode, this, value));
 		}
 
-		void insert(value_type &&value)
+		nodeptr insert(value_type &&value)
 		{
-			this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
 		}
 
 		template<typename... Types>
-		void emplace(Types&&... args)
+		nodeptr emplace(Types&&... args)
 		{
-			this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
@@ -489,7 +489,7 @@ namespace lyf
 			if (new_np != Node::_pNullNode)
 				new_np->_parent = np->_parent;
 
-			this->_delete_node(np);
+			check_t::_delete_node(np);
 			_size--;
 		}
 
@@ -505,9 +505,9 @@ namespace lyf
 
 	private:
 
-		void _insert_node(Node *pNode)
+		nodeptr _insert_node(Node *pNode)
 		{
-			nodeptr np = this->_new_node(pNode);
+			nodeptr np = check_t::_new_node(pNode);
 			const value_type &npv = np->value();
 			nodeptr x = _root, y = Node::_pNullNode;
 			while (x != Node::_pNullNode)
@@ -538,6 +538,7 @@ namespace lyf
 					y->_right = np;
 			}
 			_size++;
+			return np;
 		}
 
 	};
@@ -643,20 +644,20 @@ namespace lyf
 			return ret;
 		}
 
-		void insert(const value_type &value)
+		nodeptr insert(const value_type &value)
 		{
-			this->_insert_node(new Node(Node::_pNullNode, this, value));
+			return this->_insert_node(new Node(Node::_pNullNode, this, value));
 		}
 
-		void insert(value_type &&value)
+		nodeptr insert(value_type &&value)
 		{
-			this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
 		}
 
 		template<typename... Types>
-		void emplace(Types&&... args)
+		nodeptr emplace(Types&&... args)
 		{
-			this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
@@ -695,7 +696,7 @@ namespace lyf
 			else
 				np->_parent->_right = new_np;
 
-			this->_delete_node(np);
+			check_t::_delete_node(np);
 			_size--;
 			if (color == RBTNodeColor::BLACK)
 				this->_remove_fixup(x);
@@ -787,7 +788,7 @@ namespace lyf
 			np->_parent = left;
 		}
 
-		void _insert_node(Node *pNode)
+		nodeptr _insert_node(Node *pNode)
 		{
 			nodeptr np = check_t::_new_node(pNode);
 			const value_type &npv = np->value();
@@ -811,7 +812,9 @@ namespace lyf
 				np->_parent = p;
 			}
 			_size++;
+			nodeptr ret = np;
 			_insert_node_fixup(np);
+			return ret;
 		}
 
 		void _insert_node_fixup(nodeptr np)
@@ -1052,6 +1055,295 @@ namespace lyf
 			this->_copy_subtree(ret, *this, np);
 			return ret;
 		}
+
+		// Returns a pointer to the node containing the ith smallest key
+		// in the subtree rooted at the argument np(default the tree's root)
+		nodeptr select(size_t i, nodeptr np = nullptr)
+		{
+			if (i == 0 || i > _size)
+				throw std::runtime_error("The argument i is out of range, must be in [1, size()]");
+			if (!np)
+				np = _root;
+			size_t r;
+			while (np != Node::_pNullNode && (r = np->_left->_size + 1) != i)
+			{
+				if (i < r)
+					np = np->_left;
+				else
+				{
+					np = np->_right;
+					i -= r;
+				}
+			}
+			return np;
+		}
+
+		// Returns the position of the given node's pointer 
+		// in the linear order determined by an in-order tree walk
+		size_t rank(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			size_t r = np->_left->_size + 1;
+			while (np != _root)
+			{
+				if (np == np->_parent->_right)
+					r += np->_parent->_left->_size + 1;
+				np = np->_parent;
+			}
+			return r;
+		}
+
+		nodeptr insert(const value_type &value)
+		{
+			return this->_insert_node(new Node(Node::_pNullNode, this, value));
+		}
+
+		nodeptr insert(value_type &&value)
+		{
+			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+		}
+
+		template<typename... Types>
+		nodeptr emplace(Types&&... args)
+		{
+			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+		}
+
+		void remove(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			nodeptr new_np, x;
+			RBTNodeColor color = np->_color;
+			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
+			{
+				new_np = np->_left == Node::_pNullNode ? np->_right : np->_left;
+				x = new_np;
+			}
+			else
+			{
+				new_np = this->min_node(np->_right);
+				color = new_np->_color;
+				x = new_np->_right;
+				if (new_np != np->_right)
+				{
+					x->_parent = new_np->_parent;
+					new_np->_parent->_left = x;
+					new_np->_right = np->_right;
+					np->_right->_parent = new_np;
+				}
+				else
+					x->_parent = new_np;
+				new_np->_left = np->_left;
+				np->_left->_parent = new_np;
+				new_np->_color = np->_color;
+				new_np->_size = np->_size;
+			}
+			new_np->_parent = np->_parent;
+			if (np->_parent == Node::_pNullNode)
+				_root = new_np;
+			else if (np == np->_parent->_left)
+				np->_parent->_left = new_np;
+			else
+				np->_parent->_right = new_np;
+
+			nodeptr y = x->_parent;
+			while (y != Node::_pNullNode)
+			{
+				y->_size--;
+				y = y->_parent;
+			}
+
+			check_t::_delete_node(np);
+			_size--;
+			if (color == RBTNodeColor::BLACK)
+				this->_remove_fixup(x);
+		}
+
+		// Remove the value, returns whether it's in the tree or not
+		bool remove(const value_type &value)
+		{
+			nodeptr np = this->search(value);
+			if (!np || np == Node::_pNullNode)
+				return false;
+			this->remove(np);
+			return true;
+		}
+
+	protected:
+		// left-rotation, preserving the binary-search-tree property
+		// if the right child of the given node is null, do nothing
+		void _left_rotate(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			np->_right->_size = np->_size;
+			_MyBase::_left_rotate(np);
+			np->_size = np->_left->_size + np->_right->_size + 1;
+		}
+
+		// right-rotation, preserving the binary-search-tree property
+		// if the left child of the given node is null, do nothing
+		void _right_rotate(nodeptr np)
+		{
+			this->_ensureInTree(np);
+			np->_left->_size = np->_size;
+			_MyBase::_right_rotate(np);
+			np->_size = np->_left->_size + np->_right->_size + 1;
+		}
+
+		nodeptr _insert_node(Node *pNode)
+		{
+			nodeptr np = check_t::_new_node(pNode);
+			const value_type &npv = np->value();
+			nodeptr curr = _root, p = Node::_pNullNode;
+			while (curr != Node::_pNullNode)
+			{
+				p = curr;
+				curr->_size++;
+				if (curr->value() < npv)
+					curr = curr->_right;
+				else
+					curr = curr->_left;
+			}
+			if (p == Node::_pNullNode)
+				_root = np;
+			else
+			{
+				if (p->value() < npv)
+					p->_right = np;
+				else
+					p->_left = np;
+				np->_parent = p;
+			}
+			_size++;
+			nodeptr ret = np;
+			_insert_node_fixup(np);
+			return ret;
+		}
+
+		void _insert_node_fixup(nodeptr np)
+		{
+			nodeptr y;
+			while (np->_parent->_color == RBTNodeColor::RED)
+			{
+				if (np->_parent == np->_parent->_parent->_left)
+				{
+					y = np->_parent->_parent->_right;
+					if (y->_color == RBTNodeColor::RED)
+					{
+						np->_parent->_color = RBTNodeColor::BLACK;
+						y->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						np = np->_parent->_parent;
+					}
+					else
+					{
+						if (np == np->_parent->_right)
+						{
+							np = np->_parent;
+							_left_rotate(np);
+						}
+						np->_parent->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						_right_rotate(np->_parent->_parent);
+					}
+				}
+				else
+				{
+					y = np->_parent->_parent->_left;
+					if (y->_color == RBTNodeColor::RED)
+					{
+						np->_parent->_color = RBTNodeColor::BLACK;
+						y->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						np = np->_parent->_parent;
+					}
+					else
+					{
+						if (np == np->_parent->_left)
+						{
+							np = np->_parent;
+							_right_rotate(np);
+						}
+						np->_parent->_color = RBTNodeColor::BLACK;
+						np->_parent->_parent->_color = RBTNodeColor::RED;
+						_left_rotate(np->_parent->_parent);
+					}
+				}
+			}
+			_root->_color = RBTNodeColor::BLACK;
+		}
+
+		void _remove_fixup(nodeptr np)
+		{
+			nodeptr w;
+			while (np != _root && np->_color == RBTNodeColor::BLACK)
+			{
+				if (np == np->_parent->_left)
+				{
+					w = np->_parent->_right;
+					if (w->_color == RBTNodeColor::RED)
+					{
+						w->_color = RBTNodeColor::BLACK;
+						np->_parent->_color = RBTNodeColor::RED;
+						_left_rotate(np->_parent);
+						w = np->_parent->_right;
+					}
+					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
+					{
+						w->_color = RBTNodeColor::RED;
+						np = np->_parent;
+					}
+					else
+					{
+						if (w->_right->_color == RBTNodeColor::BLACK)
+						{
+							w->_color = RBTNodeColor::RED;
+							w->_left->_color = RBTNodeColor::BLACK;
+							_right_rotate(w);
+							w = w->_parent;
+						}
+						w->_color = np->_parent->_color;
+						np->_parent->_color = RBTNodeColor::BLACK;
+						w->_right->_color = RBTNodeColor::BLACK;
+						_left_rotate(np->_parent);
+						np = _root;
+					}
+				}
+				else
+				{
+					w = np->_parent->_left;
+					if (w->_color == RBTNodeColor::RED)
+					{
+						w->_color = RBTNodeColor::BLACK;
+						np->_parent->_color = RBTNodeColor::RED;
+						_right_rotate(np->_parent);
+						w = np->_parent->_left;
+					}
+					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
+					{
+						w->_color = RBTNodeColor::RED;
+						np = np->_parent;
+					}
+					else
+					{
+						if (w->_left->_color == RBTNodeColor::BLACK)
+						{
+							w->_color = RBTNodeColor::RED;
+							w->_right->_color = RBTNodeColor::BLACK;
+							_left_rotate(w);
+							w = w->_parent;
+						}
+						w->_color = np->_parent->_color;
+						np->_parent->_color = RBTNodeColor::BLACK;
+						w->_left->_color = RBTNodeColor::BLACK;
+						_right_rotate(np->_parent);
+						np = _root;
+					}
+				}
+			}
+			np->_color = RBTNodeColor::BLACK;
+		}
+		
 	};
 
 }
