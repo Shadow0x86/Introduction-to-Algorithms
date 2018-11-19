@@ -672,8 +672,9 @@ namespace lyf
 	{
 	public:
 		using _MyBase = _CheckedNode;
+		using value_type = Valt;
 
-		Valt &value()
+		value_type &value()
 		{
 			_ensureInCont();
 			return *_pVal;
@@ -722,8 +723,9 @@ namespace lyf
 	{
 	public:
 		using _MyBase = _CheckedNode;
+		using value_type = Valt;
 
-		Valt &value()
+		value_type &value()
 		{
 			_ensureInCont();
 			return *_pVal;

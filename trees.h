@@ -952,7 +952,7 @@ namespace lyf
 	template<typename Valt, typename Node>
 	class OrderStatisticTree;
 
-	// Node class of red-black tree
+	// Node class of order-statistic tree
 	template<typename Valt, typename Base>
 	class OSTNode : public _BaseBSTNode<Valt, Base,
 		typename _CheckedNodeContainer<OSTNode<Valt, Base>>::nodeptr>
@@ -1032,7 +1032,7 @@ namespace lyf
 			}
 		}
 
-		OrderStatisticTree(const RedBlackTree &rhs)
+		OrderStatisticTree(const OrderStatisticTree &rhs)
 			: OrderStatisticTree()
 		{
 			this->_copy_subtree(*this, rhs, rhs._root);
@@ -1349,4 +1349,185 @@ namespace lyf
 		
 	};
 
+
+	template<typename Valt, typename Node>
+	class IntervalTree;
+
+	template<typename Valt>
+	struct Interval
+	{
+
+		Interval() = delete;
+
+		Interval(Valt low, Valt high)
+			: low(low), high(high)
+		{
+		}
+
+		bool overlap(const Interval &rhs) const
+		{
+			return !(rhs.high < low) && !(high < rhs.low);
+		}
+
+		Valt low;
+		Valt high;
+	};
+
+	template<typename Valt>
+	INLINE bool operator<(const Interval<Valt> &lhs, const Interval<Valt> &rhs)
+	{
+		return lhs.low < rhs.low;
+	}
+
+	template<typename Valt>
+	INLINE bool operator>(const Interval<Valt> &lhs, const Interval<Valt> &rhs)
+	{
+		return rhs.low < lhs.low;
+	}
+
+	template<typename Valt>
+	INLINE bool operator==(const Interval<Valt> &lhs, const Interval<Valt> &rhs)
+	{
+		return lhs.low == rhs.low && lhs.high == rhs.high;
+	}
+
+	template<typename Valt>
+	INLINE bool overlap(const Interval<Valt> &lhs, const Interval<Valt> &rhs)
+	{
+		return lhs.overlap(rhs);
+	}
+
+	// Node class of interval tree
+	template<typename Valt, typename Base>
+	class INTNode : public _BaseBSTNode<Interval<Valt>, Base,
+		typename _CheckedNodeContainer<INTNode<Valt, Base>>::nodeptr>
+	{
+		friend class _CheckedNodeContainer<INTNode>;
+		friend class _BaseBinarySearchTree<Interval<Valt>, INTNode>;
+		friend class RedBlackTree<Interval<Valt>, INTNode>;
+		friend class IntervalTree<Valt, INTNode>;
+
+	public:
+		using element = Valt;
+		using value_type = Interval<element>;
+		using check_t = _CheckedNodeContainer<INTNode>;
+		using nodeptr = typename check_t::nodeptr;
+		using _MyBase = _BaseBSTNode<value_type, Base, nodeptr>;
+
+		RBTNodeColor color() const
+		{
+			this->_ensureInCont();
+			return _color;
+		}
+
+		element max() const
+		{
+			this->_ensureInCont();
+			return _max;
+		}
+
+	private:
+		inline static nodeptr const _pNullNode = check_t::_new_node(new INTNode(RBTNodeColor::BLACK));
+		RBTNodeColor _color = RBTNodeColor::RED;
+		element _max;
+
+		void _update_max()
+		{
+			element nm = this->value().high;
+			if (_left != _pNullNode)
+				nm = std::max(nm, _left->_max);
+			if (_right != _pNullNode)
+				nm = std::max(nm, _right->_max);
+			_max = nm;
+		}
+
+		void _update_max(value_type v)
+		{
+			_max = std::max(v.high, _max);
+		}
+
+		using _MyBase::_MyBase;
+
+		INTNode()
+			: _MyBase(_pNullNode), _color(RBTNodeColor::RED)
+		{
+		}
+
+		INTNode(RBTNodeColor color)
+			: _MyBase(), _color(color)
+		{
+		}
+
+		INTNode(const INTNode &rhs)
+			: _MyBase(rhs), _color(rhs._color)
+		{
+			_parent = _left = _right = _pNullNode;
+		}
+	};
+
+	template<typename Valt, typename Node = INTNode<Valt, UniqueNode<Interval<Valt>>>>
+	class IntervalTree : public RedBlackTree<Interval<Valt>, Node>
+	{
+	public:
+		using value_type = Interval<Valt>;
+		using _MyBase = RedBlackTree<value_type, Node>;
+		using check_t = typename _MyBase::check_t;
+		using nodeptr = typename check_t::nodeptr;
+
+	public:
+		IntervalTree()
+			: _MyBase()
+		{
+		}
+
+		IntervalTree(std::initializer_list<value_type> list)
+			: IntervalTree(list.begin(), list.end())
+		{
+		}
+
+		template<typename Iter>
+		IntervalTree(Iter begin, Iter end)
+		{
+			for (auto it = begin; it != end; it++)
+			{
+				this->insert(*it);
+			}
+		}
+
+		IntervalTree(const IntervalTree &rhs)
+			: IntervalTree()
+		{
+			this->_copy_subtree(*this, rhs, rhs._root);
+		}
+
+		IntervalTree &operator=(const IntervalTree &rhs)
+		{
+			if (this != &rhs)
+			{
+				this->_copy_subtree(*this, rhs, rhs._root);
+			}
+			return *this;
+		}
+
+		// A copy of the subtree rooted at the given node
+		IntervalTree subtree(nodeptr np)
+		{
+			IntervalTree ret;
+			this->_copy_subtree(ret, *this, np);
+			return ret;
+		}
+
+		nodeptr interval_search(const value_type &i) const
+		{
+			nodeptr np = _root;
+			while (np != Node::_pNullNode && !np->overlap(i))
+			{
+				if (np->_left != Node::_pNullNode && !(np->_left->_max < i.low))
+					np = np->_left;
+				else
+					np = np->_right;
+			}
+			return np;
+		}
+	};
 }
