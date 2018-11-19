@@ -1393,6 +1393,13 @@ namespace lyf
 		return lhs.overlap(rhs);
 	}
 
+	template<typename Valt>
+	INLINE std::ostream &operator<<(std::ostream &out, const Interval<Valt> &i)
+	{
+		out << "[" << i.low << "," << i.high << "]";
+		return out;
+	}
+
 	// Node class of interval tree
 	template<typename Valt, typename Base>
 	class INTNode : public _BaseBSTNode<Interval<Valt>, Base,
@@ -1454,9 +1461,21 @@ namespace lyf
 		{
 		}
 
+		INTNode(void *pCont, const Valt &value)
+			: _MyBase(pCont, value)
+		{
+			_max = this->value().high;
+		}
+
+		INTNode(void *pCont, Valt &&value)
+			: _MyBase(pCont, std::move(value))
+		{
+			_max = this->value().high;
+		}
+
 		template<typename... Types>
-		INTNode(Types&&... args)
-			: _MyBase(std::forward<Types>(args)...), _color(RBTNodeColor::RED)
+		INTNode(void *pCont, Types&&... args)
+			: _MyBase(pCont, std::forward<Types>(args)...)
 		{
 			_max = this->value().high;
 		}
@@ -1523,7 +1542,7 @@ namespace lyf
 		nodeptr interval_search(const value_type &i) const
 		{
 			nodeptr np = _root;
-			while (np != Node::_pNullNode && !np->overlap(i))
+			while (np != Node::_pNullNode && !np->value().overlap(i))
 			{
 				if (np->_left != Node::_pNullNode && !(np->_left->_max < i.low))
 					np = np->_left;
@@ -1531,6 +1550,11 @@ namespace lyf
 					np = np->_right;
 			}
 			return this->_conv_null_np(np);
+		}
+
+		nodeptr interval_search(const Valt &low, const Valt &high) const
+		{
+			return interval_search(Interval<Valt>(low, high));
 		}
 
 		nodeptr insert(const value_type &value)
