@@ -133,7 +133,6 @@ namespace lyf
 	{
 	public:
 		using value_type = Valt;
-		using _MyBase = _CheckedNodeContainer<Node>;
 		using check_t = _CheckedNodeContainer<Node>;
 		using nodeptr = typename check_t::nodeptr;
 
@@ -144,7 +143,7 @@ namespace lyf
 		}
 
 		_BaseBinarySearchTree(_BaseBinarySearchTree &&rhs)
-			: _MyBase(std::move(rhs)), _root(std::move(rhs._root)), _size(rhs._size)
+			: _root(std::move(rhs._root)), _size(rhs._size)
 		{
 			rhs._root = Node::_pNullNode;
 			rhs._size = 0;
@@ -329,7 +328,7 @@ namespace lyf
 			_destroy_subtree_recursive(np);
 		}
 
-		static void _copy_subtree_recursive(nodeptr dst_np, nodeptr src_np, size_t &size)
+		static void _copy_subtree_recursive(_BaseBinarySearchTree &dst, nodeptr dst_np, nodeptr src_np, size_t &size)
 		{
 			while (src_np != Node::_pNullNode)
 			{
@@ -337,17 +336,17 @@ namespace lyf
 				{
 					dst_np->_left = check_t::_new_node(new Node(*(src_np->_left)));
 					dst_np->_left->_parent = dst_np;
-					dst_np->_left->_setCont(&dst_np);
+					dst_np->_left->_setCont(&dst);
 					size++;
 				}
 				if (src_np->_right != Node::_pNullNode)
 				{
 					dst_np->_right = check_t::_new_node(new Node(*(src_np->_right)));
 					dst_np->_right->_parent = dst_np;
-					dst_np->_right->_setCont(&dst_np);
+					dst_np->_right->_setCont(&dst);
 					size++;
 				}
-				_copy_subtree_recursive(dst_np->_left, src_np->_left, size);
+				_copy_subtree_recursive(dst, dst_np->_left, src_np->_left, size);
 				dst_np = dst_np->_right;
 				src_np = src_np->_right;
 			}
@@ -367,7 +366,7 @@ namespace lyf
 				curr->_setCont(&dst);
 				dst._size++;
 			}
-			_copy_subtree_recursive(dst._root, np, dst._size);
+			_copy_subtree_recursive(dst, dst._root, np, dst._size);
 		}
 
 		template<typename Func>
@@ -1175,6 +1174,8 @@ namespace lyf
 		void _left_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
+			if (np->_right == Node::_pNullNode)
+				return;
 			np->_right->_size = np->_size;
 			_MyBase::_left_rotate(np);
 			np->_size = np->_left->_size + np->_right->_size + 1;
@@ -1185,6 +1186,8 @@ namespace lyf
 		void _right_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
+			if (np->_left == Node::_pNullNode)
+				return;
 			np->_left->_size = np->_size;
 			_MyBase::_right_rotate(np);
 			np->_size = np->_left->_size + np->_right->_size + 1;
