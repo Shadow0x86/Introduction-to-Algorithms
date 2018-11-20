@@ -811,9 +811,8 @@ namespace lyf
 				np->_parent = p;
 			}
 			_size++;
-			nodeptr ret = np;
 			_insert_node_fixup(np);
-			return ret;
+			return np;
 		}
 
 		void _insert_node_fixup(nodeptr np)
@@ -1214,9 +1213,8 @@ namespace lyf
 				np->_parent = p;
 			}
 			_size++;
-			nodeptr ret = np;
 			_insert_node_fixup(np);
-			return ret;
+			return np;
 		}
 
 		void _insert_node_fixup(nodeptr np)
@@ -1678,9 +1676,8 @@ namespace lyf
 				np->_parent = p;
 			}
 			_size++;
-			nodeptr ret = np;
 			_insert_node_fixup(np);
-			return ret;
+			return np;
 		}
 
 		void _insert_node_fixup(nodeptr np)
