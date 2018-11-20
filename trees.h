@@ -128,11 +128,12 @@ namespace lyf
 	};
 
 
-	template<typename Valt, typename Node>
+	template<typename Valt, typename Nodet>
 	class _BaseBinarySearchTree
 	{
 	public:
 		using value_type = Valt;
+		using Node = Nodet;
 		using check_t = _CheckedNodeContainer<Node>;
 		using nodeptr = typename check_t::nodeptr;
 
@@ -591,11 +592,12 @@ namespace lyf
 		}
 	};
 
-	template<typename Valt, typename Node = RBTNode<Valt, UniqueNode<Valt>>>
-	class RedBlackTree : public _BaseBinarySearchTree<Valt, Node>
+	template<typename Valt, typename Nodet = RBTNode<Valt, UniqueNode<Valt>>>
+	class RedBlackTree : public _BaseBinarySearchTree<Valt, Nodet>
 	{
 	public:
 		using value_type = Valt;
+		using Node = Nodet;
 		using _MyBase = _BaseBinarySearchTree<Valt, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
@@ -1002,11 +1004,12 @@ namespace lyf
 		}
 	};
 
-	template<typename Valt, typename Node = OSTNode<Valt, UniqueNode<Valt>>>
-	class OrderStatisticTree : public RedBlackTree<Valt, Node>
+	template<typename Valt, typename Nodet = OSTNode<Valt, UniqueNode<Valt>>>
+	class OrderStatisticTree : public RedBlackTree<Valt, Nodet>
 	{
 	public:
 		using value_type = Valt;
+		using Node = Nodet;
 		using _MyBase = RedBlackTree<Valt, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
@@ -1447,8 +1450,6 @@ namespace lyf
 			_max = std::max(v.high, _max);
 		}
 
-		using _MyBase::_MyBase;
-
 		INTNode()
 			: _MyBase(_pNullNode), _color(RBTNodeColor::RED)
 		{
@@ -1460,20 +1461,20 @@ namespace lyf
 		}
 
 		INTNode(void *pCont, const Valt &value)
-			: _MyBase(pCont, value)
+			: _MyBase(_pNullNode, pCont, value)
 		{
 			_max = this->value().high;
 		}
 
 		INTNode(void *pCont, Valt &&value)
-			: _MyBase(pCont, std::move(value))
+			: _MyBase(_pNullNode, pCont, std::move(value))
 		{
 			_max = this->value().high;
 		}
 
 		template<typename... Types>
 		INTNode(void *pCont, Types&&... args)
-			: _MyBase(pCont, std::forward<Types>(args)...)
+			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
 		{
 			_max = this->value().high;
 		}
@@ -1485,11 +1486,12 @@ namespace lyf
 		}
 	};
 
-	template<typename Valt, typename Node = INTNode<Valt, UniqueNode<Interval<Valt>>>>
-	class IntervalTree : public RedBlackTree<Interval<Valt>, Node>
+	template<typename Valt, typename Nodet = INTNode<Valt, UniqueNode<Interval<Valt>>>>
+	class IntervalTree : public RedBlackTree<Interval<Valt>, Nodet>
 	{
 	public:
 		using value_type = Interval<Valt>;
+		using Node = Nodet;
 		using _MyBase = RedBlackTree<value_type, Node>;
 		using check_t = typename _MyBase::check_t;
 		using nodeptr = typename check_t::nodeptr;
@@ -1557,18 +1559,18 @@ namespace lyf
 
 		nodeptr insert(const value_type &value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, value));
+			return this->_insert_node(new Node(this, value));
 		}
 
 		nodeptr insert(value_type &&value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+			return this->_insert_node(new Node(this, std::move(value)));
 		}
 
 		template<typename... Types>
 		nodeptr emplace(Types&&... args)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
