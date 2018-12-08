@@ -1350,124 +1350,24 @@ namespace lyf
 	template<typename Valt, typename Node>
 	class IntervalTree;
 
-	template<typename Valt, bool LeftOpen, bool RightOpen>
-	struct _RawInterval;
-
-	template<typename Valt, bool Open = false>
-	class _IntervalEdge
-	{
-		template<typename, bool, bool>
-		friend class _RawInterval;
-
-		explicit _IntervalEdge(Valt v)
-			: value(v)
-		{
-		}
-
-		Valt value;
-	};
-
-	template<typename Valt, bool LeftOpen, bool RightOpen>
-	class _RawInterval
-	{
-		_RawInterval() = delete;
-		_RawInterval(Valt low, Valt high)
-			: _low(low), _high(high)
-		{
-		}
-
-		_IntervalEdge<Valt, LeftOpen> _low;
-		_IntervalEdge<Valt, RightOpen> _high;
-	};
-
-	template<typename Valt, bool LeftOpen, bool RightOpen>
-	class _BaseInterval;
-
 	template<typename Valt>
-	class _BaseInterval<Valt, false, false> : public _RawInterval<Valt>
+	struct Interval
 	{
-	public:
-		using _MyBase = _RawInterval<Valt>;
-		using _MyBase::_MyBase;
-
-		bool overlap(const _BaseInterval &rhs) const
-		{
-			return !(rhs.high < low) && !(high < rhs.low);
-		}
-
-	protected:
-		inline static const char _ls = '[';
-		inline static const char _rs = ']';
-	};
-
-	template<typename Valt>
-	class _BaseInterval<Valt, false, true> : public _RawInterval<Valt>
-	{
-	public:
-		using _MyBase = _RawInterval<Valt>;
-		using _MyBase::_MyBase;
-
-		bool overlap(const _BaseInterval &rhs) const
-		{
-			return !(rhs.high <= low) && !(high <= rhs.low);
-		}
-
-	protected:
-		inline static const char _ls = '[';
-		inline static const char _rs = ')';
-	};
-
-	template<typename Valt>
-	class _BaseInterval<Valt, true, false> : public _RawInterval<Valt>
-	{
-	public:
-		using _MyBase = _RawInterval<Valt>;
-		using _MyBase::_MyBase;
-
-		bool overlap(const _BaseInterval &rhs) const
-		{
-			return !(rhs.high <= low) && !(high <= rhs.low);
-		}
-
-	protected:
-		inline static const char _ls = '(';
-		inline static const char _rs = ']';
-	};
-
-	template<typename Valt>
-	class _BaseInterval<Valt, true, true> : public _RawInterval<Valt>
-	{
-	public:
-		using _MyBase = _RawInterval<Valt>;
-		using _MyBase::_MyBase;
-
-		bool overlap(const _BaseInterval &rhs) const
-		{
-			return !(rhs.high <= low) && !(high <= rhs.low);
-		}
-
-	protected:
-		inline static const char _ls = '(';
-		inline static const char _rs = ')';
-	};
-
-	template<typename Valt, bool LeftOpen = false, bool RightOpen = false>
-	struct Interval : public _BaseInterval<Valt, LeftOpen, RightOpen>
-	{
-		using _MyBase = _BaseInterval<Valt, LeftOpen, RightOpen>;
 
 		Interval() = delete;
 
 		Interval(Valt low, Valt high)
-			: _MyBase(low, high)
+			: low(low), high(high)
 		{
 		}
 
-		friend std::ostream &operator<<(std::ostream &out, const Interval &i)
+		bool overlap(const Interval &rhs) const
 		{
-			out << i._ls << i.low << "," << i.high << i._rs;
-			return out;
+			return !(rhs.high < low) && !(high < rhs.low);
 		}
+
+		Valt low;
+		Valt high;
 	};
 
 	template<typename Valt>
@@ -1494,7 +1394,12 @@ namespace lyf
 		return lhs.overlap(rhs);
 	}
 
-	
+	template<typename Valt>
+	INLINE std::ostream &operator<<(std::ostream &out, const Interval<Valt> &i)
+	{
+		out << "[" << i.low << "," << i.high << "]";
+		return out;
+	}
 
 	// Node class of interval tree
 	template<typename Valt, typename Base>
