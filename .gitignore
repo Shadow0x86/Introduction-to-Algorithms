@@ -1,0 +1,13 @@
+﻿################################################################################
+# 此 .gitignore 文件已由 Microsoft(R) Visual Studio 自动创建。
+################################################################################
+
+/.vs/Introduction-to-Algorithms/v15
+/Release
+/x64
+/test.h
+/test.cpp
+/Introduction-to-Algorithms.vcxproj.filters
+/Introduction-to-Algorithms.vcxproj
+/Introduction-to-Algorithms.sln
+*.user

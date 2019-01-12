@@ -121,6 +121,22 @@ namespace lyf
 		{
 		}
 
+		BSTNode(void *pCont, const Valt &value)
+			: _MyBase(_pNullNode, pCont, value)
+		{
+		}
+
+		BSTNode(void *pCont, Valt &&value)
+			: _MyBase(_pNullNode, pCont, std::move(value))
+		{
+		}
+
+		template<typename... Types>
+		BSTNode(void *pCont, Types&&... args)
+			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+		{
+		}
+
 		BSTNode(const BSTNode &rhs)
 			: _MyBase(rhs), _same_flag(rhs._same_flag)
 		{
@@ -441,18 +457,18 @@ namespace lyf
 
 		nodeptr insert(const value_type &value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, value));
+			return this->_insert_node(new Node(this, value));
 		}
 
 		nodeptr insert(value_type &&value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+			return this->_insert_node(new Node(this, std::move(value)));
 		}
 
 		template<typename... Types>
 		nodeptr emplace(Types&&... args)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
@@ -570,7 +586,7 @@ namespace lyf
 		}
 
 	private:
-		inline static nodeptr const _pNullNode = check_t::_new_node(new RBTNode(RBTNodeColor::BLACK));
+		static nodeptr const _pNullNode;
 		RBTNodeColor _color = RBTNodeColor::RED;
 
 		using _MyBase::_MyBase;
@@ -585,12 +601,31 @@ namespace lyf
 		{
 		}
 
+		RBTNode(void *pCont, const Valt &value)
+			: _MyBase(_pNullNode, pCont, value)
+		{
+		}
+
+		RBTNode(void *pCont, Valt &&value)
+			: _MyBase(_pNullNode, pCont, std::move(value))
+		{
+		}
+
+		template<typename... Types>
+		RBTNode(void *pCont, Types&&... args)
+			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+		{
+		}
+
 		RBTNode(const RBTNode &rhs)
 			: _MyBase(rhs), _color(rhs._color)
 		{
 			_parent = _left = _right = _pNullNode;
 		}
 	};
+
+	template<typename Valt, typename Base>
+	typename RBTNode<Valt, Base>::nodeptr const RBTNode<Valt, Base>::_pNullNode = check_t::_new_node(new RBTNode(RBTNodeColor::BLACK));
 
 	template<typename Valt, typename Nodet = RBTNode<Valt, UniqueNode<Valt>>>
 	class RedBlackTree : public _BaseBinarySearchTree<Valt, Nodet>
@@ -647,18 +682,18 @@ namespace lyf
 
 		nodeptr insert(const value_type &value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, value));
+			return this->_insert_node(new Node(this, value));
 		}
 
 		nodeptr insert(value_type &&value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+			return this->_insert_node(new Node(this, std::move(value)));
 		}
 
 		template<typename... Types>
 		nodeptr emplace(Types&&... args)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
@@ -981,7 +1016,7 @@ namespace lyf
 		}
 
 	private:
-		inline static nodeptr const _pNullNode = check_t::_new_node(new OSTNode(RBTNodeColor::BLACK, 0));
+		static nodeptr const _pNullNode;
 		RBTNodeColor _color = RBTNodeColor::RED;
 		size_t _size = 1;
 
@@ -997,12 +1032,31 @@ namespace lyf
 		{
 		}
 
+		OSTNode(void *pCont, const Valt &value)
+			: _MyBase(_pNullNode, pCont, value)
+		{
+		}
+
+		OSTNode(void *pCont, Valt &&value)
+			: _MyBase(_pNullNode, pCont, std::move(value))
+		{
+		}
+
+		template<typename... Types>
+		OSTNode(void *pCont, Types&&... args)
+			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+		{
+		}
+
 		OSTNode(const OSTNode &rhs)
 			: _MyBase(rhs), _color(rhs._color), _size(rhs._size)
 		{
 			_parent = _left = _right = _pNullNode;
 		}
 	};
+
+	template<typename Valt, typename Base>
+	typename OSTNode<Valt, Base>::nodeptr const OSTNode<Valt, Base>::_pNullNode = check_t::_new_node(new OSTNode(RBTNodeColor::BLACK, 0));
 
 	template<typename Valt, typename Nodet = OSTNode<Valt, UniqueNode<Valt>>>
 	class OrderStatisticTree : public RedBlackTree<Valt, Nodet>
@@ -1096,18 +1150,18 @@ namespace lyf
 
 		nodeptr insert(const value_type &value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, value));
+			return this->_insert_node(new Node(this, value));
 		}
 
 		nodeptr insert(value_type &&value)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::move(value)));
+			return this->_insert_node(new Node(this, std::move(value)));
 		}
 
 		template<typename... Types>
 		nodeptr emplace(Types&&... args)
 		{
-			return this->_insert_node(new Node(Node::_pNullNode, this, std::forward<Types>(args)...));
+			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
 		void remove(nodeptr np)
@@ -1431,7 +1485,7 @@ namespace lyf
 		}
 
 	private:
-		inline static nodeptr const _pNullNode = check_t::_new_node(new INTNode(RBTNodeColor::BLACK));
+		static nodeptr const _pNullNode;
 		RBTNodeColor _color = RBTNodeColor::RED;
 		element _max = element{};
 
@@ -1485,6 +1539,9 @@ namespace lyf
 			_parent = _left = _right = _pNullNode;
 		}
 	};
+
+	template<typename Valt, typename Base>
+	typename INTNode<Valt, Base>::nodeptr const INTNode<Valt, Base>::_pNullNode = check_t::_new_node(new INTNode(RBTNodeColor::BLACK));
 
 	template<typename Valt, typename Nodet = INTNode<Valt, UniqueNode<Interval<Valt>>>>
 	class IntervalTree : public RedBlackTree<Interval<Valt>, Nodet>
