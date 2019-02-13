@@ -648,7 +648,7 @@ namespace lyf
 #endif
 		}
 
-		static void _delete_node(nodeptr &np)
+		static void _delete_node(nodeptr np)
 		{
 #if DEBUG
 			np->_reset_neighbors();
@@ -656,11 +656,10 @@ namespace lyf
 			np.reset();
 #else
 			delete np;
-			np = nullptr;
 #endif
 		}
 
-		static void _set_out(nodeptr &np)
+		static void _set_out(nodeptr np)
 		{
 			np->_setCont();
 		}
@@ -780,6 +779,12 @@ namespace lyf
 	INLINE size_t hash(const T &v, std::decay_t<decltype(v.hash())>* = nullptr)
 	{
 		return v.hash();
+	}
+
+	INLINE size_t hash(const char *vp)
+	{
+		static std::hash<std::string> h;
+		return h(vp);
 	}
 	
 }

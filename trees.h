@@ -301,7 +301,7 @@ namespace lyf
 		nodeptr _root = Node::_pNullNode;
 		size_t _size = 0;
 
-		void _ensureInTree(const nodeptr &np) const
+		void _ensureInTree(nodeptr np) const
 		{
 			np->_ensureInCont(this);
 		}

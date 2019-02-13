@@ -156,8 +156,6 @@ namespace lyf
 	private:
 		nodeptr _next = nullptr;
 
-		using _MyBase::_MyBase;
-
 		ForwardLinkedListNode() {}
 
 		ForwardLinkedListNode(const ForwardLinkedListNode &rhs)
@@ -165,7 +163,23 @@ namespace lyf
 		{
 		}
 
-		void reset_neighbors()
+		ForwardLinkedListNode(void *pCont, const Valt &value)
+			: _MyBase(pCont, value)
+		{
+		}
+
+		ForwardLinkedListNode(void *pCont, Valt &&value)
+			: _MyBase(pCont, std::move(value))
+		{
+		}
+
+		template<typename... Types>
+		ForwardLinkedListNode(void *pCont, Types&&... args)
+			: _MyBase(pCont, std::forward<Types>(args)...)
+		{
+		}
+
+		void _reset_neighbors()
 		{
 			_next = nullptr;
 		}
@@ -207,8 +221,6 @@ namespace lyf
 		nodeptr _prev = nullptr;
 		nodeptr _next = nullptr;
 
-		using _MyBase::_MyBase;
-
 		LinkedListNode() {}
 
 		LinkedListNode(const LinkedListNode &rhs)
@@ -216,7 +228,23 @@ namespace lyf
 		{
 		}
 
-		void reset_neighbors()
+		LinkedListNode(void *pCont, const Valt &value)
+			: _MyBase(pCont, value)
+		{
+		}
+
+		LinkedListNode(void *pCont, Valt &&value)
+			: _MyBase(pCont, std::move(value))
+		{
+		}
+
+		template<typename... Types>
+		LinkedListNode(void *pCont, Types&&... args)
+			: _MyBase(pCont, std::forward<Types>(args)...)
+		{
+		}
+
+		void _reset_neighbors()
 		{
 			_prev = _next = nullptr;
 		}
@@ -273,24 +301,35 @@ namespace lyf
 			return this->_find_node_by_value(value);
 		}
 
+		template<typename Func>
+		void map(Func func)
+		{
+			auto np = _head;
+			while (np)
+			{
+				func(np->value());
+				np = np->_next;
+			}
+		}
+
 	protected:
 		nodeptr _head = nullptr;
 
-		void _ensureInList(const nodeptr &node) const
+		void _ensureInList(nodeptr node) const
 		{
 			node->_ensureInCont(this);
 		}
 
 		nodeptr _find_node_by_value(const Valt &tofind) const
 		{
-			nodeptr node = _head;
-			while (node)
+			nodeptr np = _head;
+			while (np)
 			{
-				if (node->value() == tofind)
+				if (np->value() == tofind)
 					break;
-				node = node->_next;
+				np = np->_next;
 			}
-			return node;
+			return np;
 		}
 
 		void _destroy()
@@ -414,6 +453,8 @@ namespace lyf
 		// pop the node at list head
 		value_type pop()
 		{
+			if (!_size)
+				throw std::runtime_error("pop from empty list");
 			value_type ret = _head->value();
 			nodeptr oh = _head;
 			_head = _head->_next;
@@ -512,7 +553,7 @@ namespace lyf
 			_size++;
 		}
 
-		bool _insert_node(const nodeptr &tofind, nodeptr &toinsert)
+		bool _insert_node(nodeptr tofind, nodeptr toinsert)
 		{
 			if (tofind)
 				this->_ensureInList(tofind);
@@ -531,7 +572,7 @@ namespace lyf
 			return ret;
 		}
 
-		bool _remove_node(nodeptr &toremove, nodeptr &prev)
+		bool _remove_node(nodeptr toremove, nodeptr prev)
 		{
 			if (toremove)
 				this->_ensureInList(toremove);
@@ -549,7 +590,7 @@ namespace lyf
 			return ret;
 		}
 
-		std::pair<nodeptr, nodeptr> _find_node_and_prev(const nodeptr &tofind) const
+		std::pair<nodeptr, nodeptr> _find_node_and_prev(nodeptr tofind) const
 		{
 			nodeptr node = _head, prev = nullptr;
 			while (node)
@@ -760,24 +801,20 @@ namespace lyf
 		// pop the node at list head
 		value_type pop()
 		{
+			if (!_size)
+				throw std::runtime_error("pop from empty list");
 			value_type ret = _head->value();
-			nodeptr oh = _head;
-			_head->_next->_prev = nullptr;
-			_head = _head->_next;
-			this->_delete_node(oh);
-			_size--;
+			erase(_head);
 			return ret;
 		}
 
 		// pop the node at list tail
 		value_type pop_back()
 		{
+			if (!_size)
+				throw std::runtime_error("pop from empty list");
 			value_type ret = _tail->value();
-			nodeptr ot = _tail;
-			_tail->_prev->_next = nullptr;
-			_tail = _tail->_prev;
-			this->_delete_node(ot);
-			_size--;
+			erase(_tail);
 			return ret;
 		}
 
@@ -794,7 +831,7 @@ namespace lyf
 			return _insert_node(node, this->_new_node(new Node(this, std::forward<Types>(args)...)));
 		}
 
-		bool remove(nodeptr node)
+		bool erase(nodeptr node)
 		{
 			return this->_remove_node(node);
 		}
@@ -811,27 +848,13 @@ namespace lyf
 			nodeptr curr = _head;
 			while (curr)
 			{
+				auto next = curr->_next;
 				if (curr->value() == value)
 				{
-					nodeptr prev = curr->_prev;
-					nodeptr next = curr->_next;
-					if (prev)
-						prev->_next = next;
-					else
-						_head = next;
-					if (next)
-						next->_prev = prev;
-					else
-						_tail = prev;
-					this->_delete_node(curr);
-					curr = next;
+					erase(curr);
 					count++;
-					_size--;
 				}
-				else
-				{
-					curr = curr->_next;
-				}
+				curr = next;
 			}
 			return count;
 		}
@@ -898,7 +921,7 @@ namespace lyf
 			_size++;
 		}
 
-		bool _insert_node(const nodeptr &tofind, nodeptr &toinsert)
+		bool _insert_node(nodeptr tofind, nodeptr toinsert)
 		{
 			if (tofind)
 			{
@@ -924,7 +947,7 @@ namespace lyf
 			return true;
 		}
 
-		bool _remove_node(nodeptr &toremove)
+		bool _remove_node(nodeptr toremove)
 		{
 			if (toremove)
 			{
