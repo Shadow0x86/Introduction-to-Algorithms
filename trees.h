@@ -106,7 +106,7 @@ namespace lyf
 		using _MyBase = _BaseBSTNode<Valt, Base, nodeptr>;
 
 	private:
-		inline static nodeptr const _pNullNode = nullptr;
+		inline static nodeptr const _Sentinel = nullptr;
 		unsigned char _same_flag = 0;
 
 		void _reverse_flag()
@@ -117,23 +117,23 @@ namespace lyf
 		using _MyBase::_MyBase;
 
 		BSTNode()
-			: _MyBase(_pNullNode)
+			: _MyBase(_Sentinel)
 		{
 		}
 
 		BSTNode(void *pCont, const Valt &value)
-			: _MyBase(_pNullNode, pCont, value)
+			: _MyBase(_Sentinel, pCont, value)
 		{
 		}
 
 		BSTNode(void *pCont, Valt &&value)
-			: _MyBase(_pNullNode, pCont, std::move(value))
+			: _MyBase(_Sentinel, pCont, std::move(value))
 		{
 		}
 
 		template<typename... Types>
 		BSTNode(void *pCont, Types&&... args)
-			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+			: _MyBase(_Sentinel, pCont, std::forward<Types>(args)...)
 		{
 		}
 
@@ -155,14 +155,14 @@ namespace lyf
 
 	protected:
 		_BaseBinarySearchTree()
-			: _root(Node::_pNullNode), _size()
+			: _root(Node::_Sentinel), _size()
 		{
 		}
 
 		_BaseBinarySearchTree(_BaseBinarySearchTree &&rhs)
 			: _root(std::move(rhs._root)), _size(rhs._size)
 		{
-			rhs._root = Node::_pNullNode;
+			rhs._root = Node::_Sentinel;
 			rhs._size = 0;
 		}
 
@@ -173,7 +173,7 @@ namespace lyf
 				this->_destroy_subtree();
 				_root = std::move(rhs._root);
 				_size = rhs._size;
-				rhs._root = Node::_pNullNode;
+				rhs._root = Node::_Sentinel;
 				rhs._size = 0;
 			}
 			return *this;
@@ -211,7 +211,7 @@ namespace lyf
 		nodeptr search(const value_type &value) const
 		{
 			nodeptr np = _root;
-			while (np != Node::_pNullNode)
+			while (np != Node::_Sentinel)
 			{
 				if (np->value() == value)
 					break;
@@ -226,12 +226,12 @@ namespace lyf
 		// The node of maximum value in subtree which rooted at the given node(default root)
 		nodeptr max_node(nodeptr np = nullptr) const
 		{
-			if (!np || np == Node::_pNullNode)
+			if (!np || np == Node::_Sentinel)
 				np = _root;
-			if (np != Node::_pNullNode)
+			if (np != Node::_Sentinel)
 			{
 				this->_ensureInTree(np);
-				while (np->_right != Node::_pNullNode)
+				while (np->_right != Node::_Sentinel)
 					np = np->_right;
 			}
 			return this->_conv_null_np(np);
@@ -246,12 +246,12 @@ namespace lyf
 		// The node of minimum value in subtree which rooted at the given node(default root)
 		nodeptr min_node(nodeptr np = nullptr) const
 		{
-			if (!np || np == Node::_pNullNode)
+			if (!np || np == Node::_Sentinel)
 				np = _root;
-			if (np != Node::_pNullNode)
+			if (np != Node::_Sentinel)
 			{
 				this->_ensureInTree(np);
-				while (np->_left != Node::_pNullNode)
+				while (np->_left != Node::_Sentinel)
 					np = np->_left;
 			}
 			return this->_conv_null_np(np);
@@ -267,10 +267,10 @@ namespace lyf
 		nodeptr successor(nodeptr np) const
 		{
 			this->_ensureInTree(np);
-			if (np->_right != Node::_pNullNode)
+			if (np->_right != Node::_Sentinel)
 				return this->min_node(np->_right);
 			nodeptr p;
-			while ((p = np->_parent) != Node::_pNullNode && p->_left != np)
+			while ((p = np->_parent) != Node::_Sentinel && p->_left != np)
 				np = p;
 			return this->_conv_null_np(p);
 		}
@@ -279,10 +279,10 @@ namespace lyf
 		nodeptr predecessor(nodeptr np) const
 		{
 			this->_ensureInTree(np);
-			if (np->_left != Node::_pNullNode)
+			if (np->_left != Node::_Sentinel)
 				return this->max_node(np->_left);
 			nodeptr p;
-			while ((p = np->_parent) != Node::_pNullNode && p->_right != np)
+			while ((p = np->_parent) != Node::_Sentinel && p->_right != np)
 				np = p;
 			return this->_conv_null_np(p);
 		}
@@ -298,28 +298,28 @@ namespace lyf
 		}
 
 	protected:
-		nodeptr _root = Node::_pNullNode;
+		nodeptr _root = Node::_Sentinel;
 		size_t _size = 0;
 
-		void _ensureInTree(nodeptr np) const
+		virtual void _ensureInTree(nodeptr np) const
 		{
 			np->_ensureInCont(this);
 		}
 
 		static void _set_neighbors_null(nodeptr np)
 		{
-			np->_set_neighbors(Node::_pNullNode);
+			np->_set_neighbors(Node::_Sentinel);
 		}
 
 		static nodeptr _conv_null_np(nodeptr np)
 		{
-			return np == Node::_pNullNode ? nullptr : np;
+			return np == Node::_Sentinel ? nullptr : np;
 		}
 
 		void _destroy_subtree_recursive(nodeptr np)
 		{
 			nodeptr right;
-			while (np != Node::_pNullNode)
+			while (np != Node::_Sentinel)
 			{
 				_destroy_subtree_recursive(np->_left);
 				right = np->_right;
@@ -331,32 +331,32 @@ namespace lyf
 
 		void _destroy_subtree(nodeptr np = nullptr)
 		{
-			if (!np || np == Node::_pNullNode)
+			if (!np || np == Node::_Sentinel)
 				np = _root;
-			if (np != Node::_pNullNode && np->_parent != Node::_pNullNode)
+			if (np != Node::_Sentinel && np->_parent != Node::_Sentinel)
 			{
 				if (np->_parent->_left == np)
-					np->_parent->_left = Node::_pNullNode;
+					np->_parent->_left = Node::_Sentinel;
 				else
-					np->_parent->_right = Node::_pNullNode;
+					np->_parent->_right = Node::_Sentinel;
 			}
 			else
-				_root = Node::_pNullNode;
+				_root = Node::_Sentinel;
 			_destroy_subtree_recursive(np);
 		}
 
 		static void _copy_subtree_recursive(_BaseBinarySearchTree &dst, nodeptr dst_np, nodeptr src_np, size_t &size)
 		{
-			while (src_np != Node::_pNullNode)
+			while (src_np != Node::_Sentinel)
 			{
-				if (src_np->_left != Node::_pNullNode)
+				if (src_np->_left != Node::_Sentinel)
 				{
 					dst_np->_left = check_t::_new_node(new Node(*(src_np->_left)));
 					dst_np->_left->_parent = dst_np;
 					dst_np->_left->_setCont(&dst);
 					size++;
 				}
-				if (src_np->_right != Node::_pNullNode)
+				if (src_np->_right != Node::_Sentinel)
 				{
 					dst_np->_right = check_t::_new_node(new Node(*(src_np->_right)));
 					dst_np->_right->_parent = dst_np;
@@ -371,12 +371,12 @@ namespace lyf
 
 		static void _copy_subtree(_BaseBinarySearchTree &dst, const _BaseBinarySearchTree &src, nodeptr np)
 		{
-			if (!np || np == Node::_pNullNode)
+			if (!np || np == Node::_Sentinel)
 				throw std::runtime_error("Subtree's root can't be null");
 			src._ensureInTree(np);
 			dst._destroy_subtree();
 			nodeptr curr;
-			if (np != Node::_pNullNode)
+			if (np != Node::_Sentinel)
 			{
 				curr = check_t::_new_node(new Node(*np));
 				dst._root = curr;
@@ -389,7 +389,7 @@ namespace lyf
 		template<typename Func>
 		void _in_order_traversal_recursive(Func func, nodeptr np)
 		{
-			while (np != Node::_pNullNode)
+			while (np != Node::_Sentinel)
 			{
 				_in_order_traversal_recursive(func, np->_left);
 				func(np->value());
@@ -471,13 +471,15 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void erase(nodeptr np)
+		bool erase(nodeptr np)
 		{
+			if (!np || np == Node::_Sentinel)
+				return false;
 			this->_ensureInTree(np);
 			nodeptr new_np;
-			if (np->_left == Node::_pNullNode)
+			if (np->_left == Node::_Sentinel)
 				new_np = np->_right;
-			else if (np->_right == Node::_pNullNode)
+			else if (np->_right == Node::_Sentinel)
 				new_np = np->_left;
 			else
 			{
@@ -485,7 +487,7 @@ namespace lyf
 				if (new_np != np->_right)
 				{
 					new_np->_parent->_left = new_np->_right;
-					if (new_np->_right != Node::_pNullNode)
+					if (new_np->_right != Node::_Sentinel)
 						new_np->_right->_parent = new_np->_parent;
 					new_np->_right = np->_right;
 					np->_right->_parent = new_np;
@@ -493,7 +495,7 @@ namespace lyf
 				new_np->_left = np->_left;
 				np->_left->_parent = new_np;
 			}
-			if (np->_parent != Node::_pNullNode)
+			if (np->_parent != Node::_Sentinel)
 			{
 				if (np->_parent->_left == np)
 					np->_parent->_left = new_np;
@@ -501,22 +503,20 @@ namespace lyf
 					np->_parent->_right = new_np;
 			}
 			else
-				_root = new_np == nullptr ? Node::_pNullNode : new_np;
-			if (new_np != Node::_pNullNode)
+				_root = new_np == nullptr ? Node::_Sentinel : new_np;
+			if (new_np != Node::_Sentinel)
 				new_np->_parent = np->_parent;
 
 			check_t::_delete_node(np);
 			_size--;
+			return true;
 		}
 
 		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
 		{
 			nodeptr np = this->search(value);
-			if (!np || np == Node::_pNullNode)
-				return false;
-			this->erase(np);
-			return true;
+			return this->erase(np);
 		}
 
 	private:
@@ -525,8 +525,8 @@ namespace lyf
 		{
 			nodeptr np = check_t::_new_node(pNode);
 			const value_type &npv = np->value();
-			nodeptr x = _root, y = Node::_pNullNode;
-			while (x != Node::_pNullNode)
+			nodeptr x = _root, y = Node::_Sentinel;
+			while (x != Node::_Sentinel)
 			{
 				y = x;
 				if (x->value() < npv)
@@ -540,7 +540,7 @@ namespace lyf
 				}
 			}
 			np->_parent = y;
-			if (y == Node::_pNullNode)
+			if (y == Node::_Sentinel)
 				_root = np;
 			else if (y->value() < npv)
 				y->_right = np;
@@ -586,13 +586,13 @@ namespace lyf
 		}
 
 	private:
-		static nodeptr const _pNullNode;
+		static nodeptr const _Sentinel;
 		RBTNodeColor _color = RBTNodeColor::RED;
 
 		using _MyBase::_MyBase;
 
 		RBTNode()
-			: _MyBase(_pNullNode), _color(RBTNodeColor::RED)
+			: _MyBase(_Sentinel), _color(RBTNodeColor::RED)
 		{
 		}
 
@@ -602,30 +602,30 @@ namespace lyf
 		}
 
 		RBTNode(void *pCont, const Valt &value)
-			: _MyBase(_pNullNode, pCont, value)
+			: _MyBase(_Sentinel, pCont, value)
 		{
 		}
 
 		RBTNode(void *pCont, Valt &&value)
-			: _MyBase(_pNullNode, pCont, std::move(value))
+			: _MyBase(_Sentinel, pCont, std::move(value))
 		{
 		}
 
 		template<typename... Types>
 		RBTNode(void *pCont, Types&&... args)
-			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+			: _MyBase(_Sentinel, pCont, std::forward<Types>(args)...)
 		{
 		}
 
 		RBTNode(const RBTNode &rhs)
 			: _MyBase(rhs), _color(rhs._color)
 		{
-			_parent = _left = _right = _pNullNode;
+			_parent = _left = _right = _Sentinel;
 		}
 	};
 
 	template<typename Valt, typename Base>
-	typename RBTNode<Valt, Base>::nodeptr const RBTNode<Valt, Base>::_pNullNode = check_t::_new_node(new RBTNode(RBTNodeColor::BLACK));
+	typename RBTNode<Valt, Base>::nodeptr const RBTNode<Valt, Base>::_Sentinel = check_t::_new_node(new RBTNode(RBTNodeColor::BLACK));
 
 	template<typename Valt, typename Nodet = RBTNode<Valt, UniqueNode<Valt>>>
 	class RedBlackTree : public _BaseBinarySearchTree<Valt, Nodet>
@@ -696,14 +696,16 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void erase(nodeptr np)
+		bool erase(nodeptr np)
 		{
+			if (!np || np == Node::_Sentinel)
+				return false;
 			this->_ensureInTree(np);
 			nodeptr new_np, x;
 			RBTNodeColor color = np->_color;
-			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
+			if (np->_left == Node::_Sentinel || np->_right == Node::_Sentinel)
 			{
-				new_np = np->_left == Node::_pNullNode ? np->_right : np->_left;
+				new_np = np->_left == Node::_Sentinel ? np->_right : np->_left;
 				x = new_np;
 			}
 			else
@@ -725,7 +727,7 @@ namespace lyf
 				new_np->_color = np->_color;
 			}
 			new_np->_parent = np->_parent;
-			if (np->_parent == Node::_pNullNode)
+			if (np->_parent == Node::_Sentinel)
 				_root = new_np;
 			else if (np == np->_parent->_left)
 				np->_parent->_left = new_np;
@@ -736,16 +738,14 @@ namespace lyf
 			_size--;
 			if (color == RBTNodeColor::BLACK)
 				this->_remove_fixup(x);
+			return true;
 		}
 
 		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
 		{
 			nodeptr np = this->search(value);
-			if (!np || np == Node::_pNullNode)
-				return false;
-			this->erase(np);
-			return true;
+			return this->erase(np);
 		}
 
 		// check the red-black tree property, returns black-height
@@ -754,7 +754,7 @@ namespace lyf
 		{
 			if (_root->_color != RBTNodeColor::BLACK)
 				return -1;
-			if (_root == Node::_pNullNode)
+			if (_root == Node::_Sentinel)
 				return 0;
 			int lh = this->_check_property_recursive(_root->_left, 0);
 			int rh = this->_check_property_recursive(_root->_right, 0);
@@ -764,7 +764,7 @@ namespace lyf
 	protected:
 		int _check_property_recursive(nodeptr np, int h) const
 		{
-			if (np == Node::_pNullNode)
+			if (np == Node::_Sentinel)
 				return h + 1;
 			if (np->_color == RBTNodeColor::RED)
 			{
@@ -782,16 +782,16 @@ namespace lyf
 
 		// left-rotation, preserving the binary-search-tree property
 		// if the right child of the given node is null, do nothing
-		void _left_rotate(nodeptr np)
+		virtual void _left_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr right = np->_right;
-			if (right == Node::_pNullNode)
+			if (right == Node::_Sentinel)
 				return;
 			np->_right = right->_left;
-			if (right->_left != Node::_pNullNode)
+			if (right->_left != Node::_Sentinel)
 				right->_left->_parent = np;
-			if (np->_parent == Node::_pNullNode)
+			if (np->_parent == Node::_Sentinel)
 				_root = right;
 			else if (np == np->_parent->_left)
 				np->_parent->_left = right;
@@ -804,16 +804,16 @@ namespace lyf
 
 		// right-rotation, preserving the binary-search-tree property
 		// if the left child of the given node is null, do nothing
-		void _right_rotate(nodeptr np)
+		virtual void _right_rotate(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr left = np->_left;
-			if (left == Node::_pNullNode)
+			if (left == Node::_Sentinel)
 				return;
 			np->_left = left->_right;
-			if (left->_right != Node::_pNullNode)
+			if (left->_right != Node::_Sentinel)
 				left->_right->_parent = np;
-			if (np->_parent == Node::_pNullNode)
+			if (np->_parent == Node::_Sentinel)
 				_root = left;
 			else if (np == np->_parent->_right)
 				np->_parent->_right = left;
@@ -828,8 +828,8 @@ namespace lyf
 		{
 			nodeptr np = check_t::_new_node(pNode);
 			const value_type &npv = np->value();
-			nodeptr curr = _root, p = Node::_pNullNode;
-			while (curr != Node::_pNullNode)
+			nodeptr curr = _root, p = Node::_Sentinel;
+			while (curr != Node::_Sentinel)
 			{
 				p = curr;
 				if (curr->value() < npv)
@@ -837,7 +837,7 @@ namespace lyf
 				else
 					curr = curr->_left;
 			}
-			if (p == Node::_pNullNode)
+			if (p == Node::_Sentinel)
 				_root = np;
 			else
 			{
@@ -872,11 +872,11 @@ namespace lyf
 						if (np == np->_parent->_right)
 						{
 							np = np->_parent;
-							_left_rotate(np);
+							this->_left_rotate(np);
 						}
 						np->_parent->_color = RBTNodeColor::BLACK;
 						np->_parent->_parent->_color = RBTNodeColor::RED;
-						_right_rotate(np->_parent->_parent);
+						this->_right_rotate(np->_parent->_parent);
 					}
 				}
 				else
@@ -894,11 +894,11 @@ namespace lyf
 						if (np == np->_parent->_left)
 						{
 							np = np->_parent;
-							_right_rotate(np);
+							this->_right_rotate(np);
 						}
 						np->_parent->_color = RBTNodeColor::BLACK;
 						np->_parent->_parent->_color = RBTNodeColor::RED;
-						_left_rotate(np->_parent->_parent);
+						this->_left_rotate(np->_parent->_parent);
 					}
 				}
 			}
@@ -917,7 +917,7 @@ namespace lyf
 					{
 						w->_color = RBTNodeColor::BLACK;
 						np->_parent->_color = RBTNodeColor::RED;
-						_left_rotate(np->_parent);
+						this->_left_rotate(np->_parent);
 						w = np->_parent->_right;
 					}
 					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
@@ -931,13 +931,13 @@ namespace lyf
 						{
 							w->_color = RBTNodeColor::RED;
 							w->_left->_color = RBTNodeColor::BLACK;
-							_right_rotate(w);
+							this->_right_rotate(w);
 							w = w->_parent;
 						}
 						w->_color = np->_parent->_color;
 						np->_parent->_color = RBTNodeColor::BLACK;
 						w->_right->_color = RBTNodeColor::BLACK;
-						_left_rotate(np->_parent);
+						this->_left_rotate(np->_parent);
 						np = _root;
 					}
 				}
@@ -948,7 +948,7 @@ namespace lyf
 					{
 						w->_color = RBTNodeColor::BLACK;
 						np->_parent->_color = RBTNodeColor::RED;
-						_right_rotate(np->_parent);
+						this->_right_rotate(np->_parent);
 						w = np->_parent->_left;
 					}
 					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
@@ -962,13 +962,13 @@ namespace lyf
 						{
 							w->_color = RBTNodeColor::RED;
 							w->_right->_color = RBTNodeColor::BLACK;
-							_left_rotate(w);
+							this->_left_rotate(w);
 							w = w->_parent;
 						}
 						w->_color = np->_parent->_color;
 						np->_parent->_color = RBTNodeColor::BLACK;
 						w->_left->_color = RBTNodeColor::BLACK;
-						_right_rotate(np->_parent);
+						this->_right_rotate(np->_parent);
 						np = _root;
 					}
 				}
@@ -1016,14 +1016,14 @@ namespace lyf
 		}
 
 	private:
-		static nodeptr const _pNullNode;
+		static nodeptr const _Sentinel;
 		RBTNodeColor _color = RBTNodeColor::RED;
 		size_t _size = 1;
 
 		using _MyBase::_MyBase;
 
 		OSTNode()
-			: _MyBase(_pNullNode), _color(RBTNodeColor::RED), _size(1)
+			: _MyBase(_Sentinel), _color(RBTNodeColor::RED), _size(1)
 		{
 		}
 
@@ -1033,30 +1033,30 @@ namespace lyf
 		}
 
 		OSTNode(void *pCont, const Valt &value)
-			: _MyBase(_pNullNode, pCont, value)
+			: _MyBase(_Sentinel, pCont, value)
 		{
 		}
 
 		OSTNode(void *pCont, Valt &&value)
-			: _MyBase(_pNullNode, pCont, std::move(value))
+			: _MyBase(_Sentinel, pCont, std::move(value))
 		{
 		}
 
 		template<typename... Types>
 		OSTNode(void *pCont, Types&&... args)
-			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+			: _MyBase(_Sentinel, pCont, std::forward<Types>(args)...)
 		{
 		}
 
 		OSTNode(const OSTNode &rhs)
 			: _MyBase(rhs), _color(rhs._color), _size(rhs._size)
 		{
-			_parent = _left = _right = _pNullNode;
+			_parent = _left = _right = _Sentinel;
 		}
 	};
 
 	template<typename Valt, typename Base>
-	typename OSTNode<Valt, Base>::nodeptr const OSTNode<Valt, Base>::_pNullNode = check_t::_new_node(new OSTNode(RBTNodeColor::BLACK, 0));
+	typename OSTNode<Valt, Base>::nodeptr const OSTNode<Valt, Base>::_Sentinel = check_t::_new_node(new OSTNode(RBTNodeColor::BLACK, 0));
 
 	template<typename Valt, typename Nodet = OSTNode<Valt, UniqueNode<Valt>>>
 	class OrderStatisticTree : public RedBlackTree<Valt, Nodet>
@@ -1120,7 +1120,7 @@ namespace lyf
 			if (!np)
 				np = _root;
 			size_t r;
-			while (np != Node::_pNullNode && (r = np->_left->_size + 1) != i)
+			while (np != Node::_Sentinel && (r = np->_left->_size + 1) != i)
 			{
 				if (i < r)
 					np = np->_left;
@@ -1164,14 +1164,16 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void erase(nodeptr np)
+		bool erase(nodeptr np)
 		{
+			if (!np || np == Node::_Sentinel)
+				return false;
 			this->_ensureInTree(np);
 			nodeptr new_np, x;
 			RBTNodeColor color = np->_color;
-			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
+			if (np->_left == Node::_Sentinel || np->_right == Node::_Sentinel)
 			{
-				new_np = np->_left == Node::_pNullNode ? np->_right : np->_left;
+				new_np = np->_left == Node::_Sentinel ? np->_right : np->_left;
 				x = new_np;
 			}
 			else
@@ -1194,7 +1196,7 @@ namespace lyf
 				new_np->_size = np->_size;
 			}
 			new_np->_parent = np->_parent;
-			if (np->_parent == Node::_pNullNode)
+			if (np->_parent == Node::_Sentinel)
 				_root = new_np;
 			else if (np == np->_parent->_left)
 				np->_parent->_left = new_np;
@@ -1202,7 +1204,7 @@ namespace lyf
 				np->_parent->_right = new_np;
 
 			nodeptr y = x->_parent;
-			while (y != Node::_pNullNode)
+			while (y != Node::_Sentinel)
 			{
 				y->_size--;
 				y = y->_parent;
@@ -1212,33 +1214,31 @@ namespace lyf
 			_size--;
 			if (color == RBTNodeColor::BLACK)
 				this->_remove_fixup(x);
+			return true;
 		}
 
 		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
 		{
 			nodeptr np = this->search(value);
-			if (!np || np == Node::_pNullNode)
-				return false;
-			this->erase(np);
-			return true;
+			return this->erase(np);
 		}
 
 	protected:
-		void _left_rotate(nodeptr np)
+		virtual void _left_rotate(nodeptr np) override
 		{
 			this->_ensureInTree(np);
-			if (np->_right == Node::_pNullNode)
+			if (np->_right == Node::_Sentinel)
 				return;
 			np->_right->_size = np->_size;
 			_MyBase::_left_rotate(np);
 			np->_size = np->_left->_size + np->_right->_size + 1;
 		}
 
-		void _right_rotate(nodeptr np)
+		virtual void _right_rotate(nodeptr np) override
 		{
 			this->_ensureInTree(np);
-			if (np->_left == Node::_pNullNode)
+			if (np->_left == Node::_Sentinel)
 				return;
 			np->_left->_size = np->_size;
 			_MyBase::_right_rotate(np);
@@ -1249,8 +1249,8 @@ namespace lyf
 		{
 			nodeptr np = check_t::_new_node(pNode);
 			const value_type &npv = np->value();
-			nodeptr curr = _root, p = Node::_pNullNode;
-			while (curr != Node::_pNullNode)
+			nodeptr curr = _root, p = Node::_Sentinel;
+			while (curr != Node::_Sentinel)
 			{
 				p = curr;
 				curr->_size++;
@@ -1259,7 +1259,7 @@ namespace lyf
 				else
 					curr = curr->_left;
 			}
-			if (p == Node::_pNullNode)
+			if (p == Node::_Sentinel)
 				_root = np;
 			else
 			{
@@ -1273,131 +1273,6 @@ namespace lyf
 			_insert_node_fixup(np);
 			return np;
 		}
-
-		void _insert_node_fixup(nodeptr np)
-		{
-			nodeptr y;
-			while (np->_parent->_color == RBTNodeColor::RED)
-			{
-				if (np->_parent == np->_parent->_parent->_left)
-				{
-					y = np->_parent->_parent->_right;
-					if (y->_color == RBTNodeColor::RED)
-					{
-						np->_parent->_color = RBTNodeColor::BLACK;
-						y->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						np = np->_parent->_parent;
-					}
-					else
-					{
-						if (np == np->_parent->_right)
-						{
-							np = np->_parent;
-							_left_rotate(np);
-						}
-						np->_parent->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						_right_rotate(np->_parent->_parent);
-					}
-				}
-				else
-				{
-					y = np->_parent->_parent->_left;
-					if (y->_color == RBTNodeColor::RED)
-					{
-						np->_parent->_color = RBTNodeColor::BLACK;
-						y->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						np = np->_parent->_parent;
-					}
-					else
-					{
-						if (np == np->_parent->_left)
-						{
-							np = np->_parent;
-							_right_rotate(np);
-						}
-						np->_parent->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						_left_rotate(np->_parent->_parent);
-					}
-				}
-			}
-			_root->_color = RBTNodeColor::BLACK;
-		}
-
-		void _remove_fixup(nodeptr np)
-		{
-			nodeptr w;
-			while (np != _root && np->_color == RBTNodeColor::BLACK)
-			{
-				if (np == np->_parent->_left)
-				{
-					w = np->_parent->_right;
-					if (w->_color == RBTNodeColor::RED)
-					{
-						w->_color = RBTNodeColor::BLACK;
-						np->_parent->_color = RBTNodeColor::RED;
-						_left_rotate(np->_parent);
-						w = np->_parent->_right;
-					}
-					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
-					{
-						w->_color = RBTNodeColor::RED;
-						np = np->_parent;
-					}
-					else
-					{
-						if (w->_right->_color == RBTNodeColor::BLACK)
-						{
-							w->_color = RBTNodeColor::RED;
-							w->_left->_color = RBTNodeColor::BLACK;
-							_right_rotate(w);
-							w = w->_parent;
-						}
-						w->_color = np->_parent->_color;
-						np->_parent->_color = RBTNodeColor::BLACK;
-						w->_right->_color = RBTNodeColor::BLACK;
-						_left_rotate(np->_parent);
-						np = _root;
-					}
-				}
-				else
-				{
-					w = np->_parent->_left;
-					if (w->_color == RBTNodeColor::RED)
-					{
-						w->_color = RBTNodeColor::BLACK;
-						np->_parent->_color = RBTNodeColor::RED;
-						_right_rotate(np->_parent);
-						w = np->_parent->_left;
-					}
-					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
-					{
-						w->_color = RBTNodeColor::RED;
-						np = np->_parent;
-					}
-					else
-					{
-						if (w->_left->_color == RBTNodeColor::BLACK)
-						{
-							w->_color = RBTNodeColor::RED;
-							w->_right->_color = RBTNodeColor::BLACK;
-							_left_rotate(w);
-							w = w->_parent;
-						}
-						w->_color = np->_parent->_color;
-						np->_parent->_color = RBTNodeColor::BLACK;
-						w->_left->_color = RBTNodeColor::BLACK;
-						_right_rotate(np->_parent);
-						np = _root;
-					}
-				}
-			}
-			np->_color = RBTNodeColor::BLACK;
-		}
-		
 	};
 
 
@@ -1485,16 +1360,16 @@ namespace lyf
 		}
 
 	private:
-		static nodeptr const _pNullNode;
+		static nodeptr const _Sentinel;
 		RBTNodeColor _color = RBTNodeColor::RED;
 		element _max = element{};
 
 		void _update_max()
 		{
 			element nm = this->value().high;
-			if (_left != _pNullNode)
+			if (_left != _Sentinel)
 				nm = std::max(nm, _left->_max);
-			if (_right != _pNullNode)
+			if (_right != _Sentinel)
 				nm = std::max(nm, _right->_max);
 			_max = nm;
 		}
@@ -1505,7 +1380,7 @@ namespace lyf
 		}
 
 		INTNode()
-			: _MyBase(_pNullNode), _color(RBTNodeColor::RED)
+			: _MyBase(_Sentinel), _color(RBTNodeColor::RED)
 		{
 		}
 
@@ -1515,20 +1390,20 @@ namespace lyf
 		}
 
 		INTNode(void *pCont, const Valt &value)
-			: _MyBase(_pNullNode, pCont, value)
+			: _MyBase(_Sentinel, pCont, value)
 		{
 			_max = this->value().high;
 		}
 
 		INTNode(void *pCont, Valt &&value)
-			: _MyBase(_pNullNode, pCont, std::move(value))
+			: _MyBase(_Sentinel, pCont, std::move(value))
 		{
 			_max = this->value().high;
 		}
 
 		template<typename... Types>
 		INTNode(void *pCont, Types&&... args)
-			: _MyBase(_pNullNode, pCont, std::forward<Types>(args)...)
+			: _MyBase(_Sentinel, pCont, std::forward<Types>(args)...)
 		{
 			_max = this->value().high;
 		}
@@ -1536,12 +1411,12 @@ namespace lyf
 		INTNode(const INTNode &rhs)
 			: _MyBase(rhs), _color(rhs._color), _max(rhs._max)
 		{
-			_parent = _left = _right = _pNullNode;
+			_parent = _left = _right = _Sentinel;
 		}
 	};
 
 	template<typename Valt, typename Base>
-	typename INTNode<Valt, Base>::nodeptr const INTNode<Valt, Base>::_pNullNode = check_t::_new_node(new INTNode(RBTNodeColor::BLACK));
+	typename INTNode<Valt, Base>::nodeptr const INTNode<Valt, Base>::_Sentinel = check_t::_new_node(new INTNode(RBTNodeColor::BLACK));
 
 	template<typename Valt, typename Nodet = INTNode<Valt, UniqueNode<Interval<Valt>>>>
 	class IntervalTree : public RedBlackTree<Interval<Valt>, Nodet>
@@ -1596,12 +1471,17 @@ namespace lyf
 			return ret;
 		}
 
-		nodeptr interval_search(const value_type &i) const
+		nodeptr search(const Valt &low, const Valt &high) const
+		{
+			return _MyBase::search(Interval<Valt>(low, high));
+		}
+
+		nodeptr intersect_search(const value_type &i) const
 		{
 			nodeptr np = _root;
-			while (np != Node::_pNullNode && !np->value().overlap(i))
+			while (np != Node::_Sentinel && !np->value().overlap(i))
 			{
-				if (np->_left != Node::_pNullNode && !(np->_left->_max < i.low))
+				if (np->_left != Node::_Sentinel && !(np->_left->_max < i.low))
 					np = np->_left;
 				else
 					np = np->_right;
@@ -1609,9 +1489,9 @@ namespace lyf
 			return this->_conv_null_np(np);
 		}
 
-		nodeptr interval_search(const Valt &low, const Valt &high) const
+		nodeptr intersect_search(const Valt &low, const Valt &high) const
 		{
-			return interval_search(Interval<Valt>(low, high));
+			return intersect_search(Interval<Valt>(low, high));
 		}
 
 		nodeptr insert(const value_type &value)
@@ -1630,14 +1510,16 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void erase(nodeptr np)
+		bool erase(nodeptr np)
 		{
+			if (!np || np == Node::_Sentinel)
+				return false;
 			this->_ensureInTree(np);
 			nodeptr new_np, x;
 			RBTNodeColor color = np->_color;
-			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
+			if (np->_left == Node::_Sentinel || np->_right == Node::_Sentinel)
 			{
-				new_np = np->_left == Node::_pNullNode ? np->_right : np->_left;
+				new_np = np->_left == Node::_Sentinel ? np->_right : np->_left;
 				x = new_np;
 			}
 			else
@@ -1659,7 +1541,7 @@ namespace lyf
 				new_np->_color = np->_color;
 			}
 			new_np->_parent = np->_parent;
-			if (np->_parent == Node::_pNullNode)
+			if (np->_parent == Node::_Sentinel)
 				_root = new_np;
 			else if (np == np->_parent->_left)
 				np->_parent->_left = new_np;
@@ -1667,7 +1549,7 @@ namespace lyf
 				np->_parent->_right = new_np;
 
 			nodeptr y = x->_parent;
-			while (y != Node::_pNullNode)
+			while (y != Node::_Sentinel)
 			{
 				y->_update_max();
 				y = y->_parent;
@@ -1677,33 +1559,31 @@ namespace lyf
 			_size--;
 			if (color == RBTNodeColor::BLACK)
 				this->_remove_fixup(x);
+			return true;
 		}
 
 		// Remove the value, returns whether it's in the tree or not
 		bool remove(const value_type &value)
 		{
 			nodeptr np = this->search(value);
-			if (!np || np == Node::_pNullNode)
-				return false;
-			this->erase(np);
-			return true;
+			return this->erase(np);
 		}
 
 	protected:
-		void _left_rotate(nodeptr np)
+		virtual void _left_rotate(nodeptr np) override
 		{
 			this->_ensureInTree(np);
-			if (np->_right == Node::_pNullNode)
+			if (np->_right == Node::_Sentinel)
 				return;
 			np->_right->_max = np->_max;
 			_MyBase::_left_rotate(np);
 			np->_update_max();
 		}
 
-		void _right_rotate(nodeptr np)
+		virtual void _right_rotate(nodeptr np) override
 		{
 			this->_ensureInTree(np);
-			if (np->_left == Node::_pNullNode)
+			if (np->_left == Node::_Sentinel)
 				return;
 			np->_left->_max = np->_max;
 			_MyBase::_right_rotate(np);
@@ -1714,8 +1594,8 @@ namespace lyf
 		{
 			nodeptr np = check_t::_new_node(pNode);
 			const value_type &npv = np->value();
-			nodeptr curr = _root, p = Node::_pNullNode;
-			while (curr != Node::_pNullNode)
+			nodeptr curr = _root, p = Node::_Sentinel;
+			while (curr != Node::_Sentinel)
 			{
 				p = curr;
 				curr->_update_max(np->value());
@@ -1724,7 +1604,7 @@ namespace lyf
 				else
 					curr = curr->_left;
 			}
-			if (p == Node::_pNullNode)
+			if (p == Node::_Sentinel)
 				_root = np;
 			else
 			{
@@ -1737,130 +1617,6 @@ namespace lyf
 			_size++;
 			_insert_node_fixup(np);
 			return np;
-		}
-
-		void _insert_node_fixup(nodeptr np)
-		{
-			nodeptr y;
-			while (np->_parent->_color == RBTNodeColor::RED)
-			{
-				if (np->_parent == np->_parent->_parent->_left)
-				{
-					y = np->_parent->_parent->_right;
-					if (y->_color == RBTNodeColor::RED)
-					{
-						np->_parent->_color = RBTNodeColor::BLACK;
-						y->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						np = np->_parent->_parent;
-					}
-					else
-					{
-						if (np == np->_parent->_right)
-						{
-							np = np->_parent;
-							_left_rotate(np);
-						}
-						np->_parent->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						_right_rotate(np->_parent->_parent);
-					}
-				}
-				else
-				{
-					y = np->_parent->_parent->_left;
-					if (y->_color == RBTNodeColor::RED)
-					{
-						np->_parent->_color = RBTNodeColor::BLACK;
-						y->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						np = np->_parent->_parent;
-					}
-					else
-					{
-						if (np == np->_parent->_left)
-						{
-							np = np->_parent;
-							_right_rotate(np);
-						}
-						np->_parent->_color = RBTNodeColor::BLACK;
-						np->_parent->_parent->_color = RBTNodeColor::RED;
-						_left_rotate(np->_parent->_parent);
-					}
-				}
-			}
-			_root->_color = RBTNodeColor::BLACK;
-		}
-
-		void _remove_fixup(nodeptr np)
-		{
-			nodeptr w;
-			while (np != _root && np->_color == RBTNodeColor::BLACK)
-			{
-				if (np == np->_parent->_left)
-				{
-					w = np->_parent->_right;
-					if (w->_color == RBTNodeColor::RED)
-					{
-						w->_color = RBTNodeColor::BLACK;
-						np->_parent->_color = RBTNodeColor::RED;
-						_left_rotate(np->_parent);
-						w = np->_parent->_right;
-					}
-					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
-					{
-						w->_color = RBTNodeColor::RED;
-						np = np->_parent;
-					}
-					else
-					{
-						if (w->_right->_color == RBTNodeColor::BLACK)
-						{
-							w->_color = RBTNodeColor::RED;
-							w->_left->_color = RBTNodeColor::BLACK;
-							_right_rotate(w);
-							w = w->_parent;
-						}
-						w->_color = np->_parent->_color;
-						np->_parent->_color = RBTNodeColor::BLACK;
-						w->_right->_color = RBTNodeColor::BLACK;
-						_left_rotate(np->_parent);
-						np = _root;
-					}
-				}
-				else
-				{
-					w = np->_parent->_left;
-					if (w->_color == RBTNodeColor::RED)
-					{
-						w->_color = RBTNodeColor::BLACK;
-						np->_parent->_color = RBTNodeColor::RED;
-						_right_rotate(np->_parent);
-						w = np->_parent->_left;
-					}
-					if (w->_left->_color == RBTNodeColor::BLACK && w->_right->_color == RBTNodeColor::BLACK)
-					{
-						w->_color = RBTNodeColor::RED;
-						np = np->_parent;
-					}
-					else
-					{
-						if (w->_left->_color == RBTNodeColor::BLACK)
-						{
-							w->_color = RBTNodeColor::RED;
-							w->_right->_color = RBTNodeColor::BLACK;
-							_left_rotate(w);
-							w = w->_parent;
-						}
-						w->_color = np->_parent->_color;
-						np->_parent->_color = RBTNodeColor::BLACK;
-						w->_left->_color = RBTNodeColor::BLACK;
-						_right_rotate(np->_parent);
-						np = _root;
-					}
-				}
-			}
-			np->_color = RBTNodeColor::BLACK;
 		}
 	};
 }
