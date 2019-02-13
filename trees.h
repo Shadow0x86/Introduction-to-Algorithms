@@ -471,14 +471,14 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void remove(nodeptr np)
+		void erase(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr new_np;
-			if (np->_left == Node::_pNullNode || np->_right == Node::_pNullNode)
-			{
-				new_np = np->_left != Node::_pNullNode ? np->_left : np->_right;
-			}
+			if (np->_left == Node::_pNullNode)
+				new_np = np->_right;
+			else if (np->_right == Node::_pNullNode)
+				new_np = np->_left;
 			else
 			{
 				new_np = this->min_node(np->_right);
@@ -515,7 +515,7 @@ namespace lyf
 			nodeptr np = this->search(value);
 			if (!np || np == Node::_pNullNode)
 				return false;
-			this->remove(np);
+			this->erase(np);
 			return true;
 		}
 
@@ -696,7 +696,7 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void remove(nodeptr np)
+		void erase(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr new_np, x;
@@ -744,7 +744,7 @@ namespace lyf
 			nodeptr np = this->search(value);
 			if (!np || np == Node::_pNullNode)
 				return false;
-			this->remove(np);
+			this->erase(np);
 			return true;
 		}
 
@@ -1164,7 +1164,7 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void remove(nodeptr np)
+		void erase(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr new_np, x;
@@ -1220,7 +1220,7 @@ namespace lyf
 			nodeptr np = this->search(value);
 			if (!np || np == Node::_pNullNode)
 				return false;
-			this->remove(np);
+			this->erase(np);
 			return true;
 		}
 
@@ -1630,7 +1630,7 @@ namespace lyf
 			return this->_insert_node(new Node(this, std::forward<Types>(args)...));
 		}
 
-		void remove(nodeptr np)
+		void erase(nodeptr np)
 		{
 			this->_ensureInTree(np);
 			nodeptr new_np, x;
@@ -1685,7 +1685,7 @@ namespace lyf
 			nodeptr np = this->search(value);
 			if (!np || np == Node::_pNullNode)
 				return false;
-			this->remove(np);
+			this->erase(np);
 			return true;
 		}
 
