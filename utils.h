@@ -336,6 +336,24 @@ namespace lyf
 		}
 	};
 
+	template<typename Array_t>
+	struct array_traits
+	{
+		using value_type = typename Array_t::value_type;
+	};
+
+	template<typename Valt>
+	struct array_traits<Valt*>
+	{
+		using value_type = Valt;
+	};
+
+	template<typename Valt, unsigned N>
+	struct array_traits<Valt[N]>
+	{
+		using value_type = Valt;
+	};
+
 	
 	template<typename Iter>
 	auto rbegin(Iter begin, Iter end)

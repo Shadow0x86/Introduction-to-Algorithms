@@ -44,10 +44,13 @@ namespace lyf
 		using value_type = typename Iter_traits<Iter>::value_type;
 		using difference_type = typename Iter_traits<Iter>::difference_type;
 
-		explicit BaseHeap(Key key = nullptr) : key(key) {}
+		explicit BaseHeap(Key key = nullptr)
+			: key(key)
+		{
+		}
 
 		BaseHeap(Iter begin, Iter end, Key key = nullptr)
-			:begin(begin), end(end), key(key)
+			: begin(begin), end(end), key(key)
 		{
 			_ensureValidRange(begin, end);
 		}

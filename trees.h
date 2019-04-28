@@ -292,7 +292,7 @@ namespace lyf
 		template<typename Func>
 		void in_order_traversal(Func func, nodeptr np = nullptr)
 		{
-			if (!np)
+			if (!np || np == Node::_Sentinel)
 				np = _root;
 			this->_in_order_traversal_recursive(func, np);
 		}
