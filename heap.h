@@ -277,8 +277,8 @@ namespace lyf
 		return MaxPriorityQueue<Ele, Key, Container>(init_cap, key);
 	}
 
-	template<typename Ele,
-		typename Iter,
+	template<typename Iter,
+		typename Ele = typename Iter_traits<Iter>::value_type,
 		typename Key = void*,
 		typename Container = std::vector<Ele>>
 	auto newMaxPriorityQueue(Iter begin, Iter end, Key key = nullptr)
@@ -303,8 +303,8 @@ namespace lyf
 		return MinPriorityQueue<Ele, Key, Container>(init_cap, key);
 	}
 
-	template<typename Ele,
-		typename Iter,
+	template<typename Iter,
+		typename Ele = typename Iter_traits<Iter>::value_type,
 		typename Key = void*,
 		typename Container = std::vector<Ele>>
 	auto newMinPriorityQueue(Iter begin, Iter end, Key key = nullptr)
