@@ -270,4 +270,39 @@ namespace lyf
 		delete[] c;
 		return ret;
 	}
+
+	template<typename WSeq, typename VSeq>
+	auto knapsack_problem(const WSeq &wseq, const VSeq &vseq, size_t len, size_t total_weight)
+	{
+		vector<size_t> ret;
+		if (!len)
+			return ret;
+		using value_type = typename array_traits<VSeq>::value_type;
+		size_t nrows = total_weight + 1, ncols = len + 1;
+		auto c = new value_type[nrows*ncols];
+		for (size_t i = 0; i != nrows; i++)
+			c[i*ncols] = 0;
+		for (size_t j = 1; j != ncols; j++)
+			c[j] = 0;
+		for (size_t i = 1; i != nrows; i++)
+		{
+			for (size_t j = 1; j != ncols; j++)
+			{
+				size_t k = j - 1;
+				c[i*ncols + j] = std::max(c[i*ncols + k], wseq[k] > i ? 0 : (c[(i - wseq[k])*ncols + k] + vseq[k]));
+			}
+		}
+		size_t w = total_weight, n = len;
+		while (w > 0 && n > 0)
+		{
+			--n;
+			if (c[w*ncols + n + 1] != c[w*ncols + n])
+			{
+				w -= wseq[n];
+				ret.push_back(n);
+			}
+		}
+		delete[] c;
+		return ret;
+	}
 }
