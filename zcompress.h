@@ -99,9 +99,27 @@ namespace lyf
 			this->_deleteTree(this->_root);
 		}
 
-		virtual void getData(void *pdata, size_t size) override
+		virtual void getData(void *pdata, size_t nBytes) override
 		{
-			auto ulen = sizeof Unit;
+			auto size = nBytes / sizeof Unit;
+			Unit *p = reinterpret_cast<Unit*>(pdata);
+			for (size_t i = 0; i != size; i++)
+			{
+				auto v = p[i];
+				if (_Unit2Node.count(v))
+					_Unit2Node[v]->inc();
+				else
+					_Unit2Node[v] = new Node(v);
+			}
+			auto rest = nBytes - size * sizeof Unit;
+			if (rest)
+			{
+				auto v = p[size] & ~((~static_cast<Unit>(0))>>rest);
+				if (_Unit2Node.count(v))
+					_Unit2Node[v]->inc();
+				else
+					_Unit2Node[v] = new Node(v);
+			}
 		}
 
 		virtual void generate() override
