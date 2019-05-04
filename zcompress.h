@@ -144,7 +144,24 @@ namespace lyf
 
 		virtual const BitSet *getCode(Unit data) const override
 		{
-			return (*_Unit2BitSet)[data];
+			auto &bs = *_Unit2BitSet;
+			return bs.count(data) ? bs[data] : nullptr;
+		}
+
+		void showCode(size_t n = 0)
+		{
+			if (!n)
+				n = _Unit2BitSet->size();
+			size_t k = 0;
+			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end() && k != n; it++, k++)
+			{
+				cout << it->first << ": ";
+				for (auto i = it->second->begin(); i != it->second->end(); i++)
+				{
+					cout << *i;
+				}
+				cout << endl;
+			}
 		}
 
 	private:
@@ -206,7 +223,7 @@ namespace lyf
 		double compressRate();
 
 	private:
-		inline static const double _NoDeepFactor = 0.95;
+		inline static const double _NoDeepFactor = 0.99;
 	};
 
 	using HuffmanCompresser = ZCompresser<HuffmanTree<uint16_t>>;
