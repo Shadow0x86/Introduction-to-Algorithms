@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
-#include <functional>
 #include "heap.h"
 
 
@@ -73,9 +72,11 @@ namespace lyf
 		using Node = _HuffmanNode;
 		using NMap = std::unordered_map<Unit, Node*>;
 		using BMap = std::unordered_map<Unit, BitSet*>;
+		using Buff_t = char;
 
 		HuffmanTree()
-			: _Unit2Node(new NMap()), _Unit2BitSet(new BMap()), _root(nullptr)
+			: _Unit2Node(new NMap()), _Unit2BitSet(new BMap()), _isGenerated(false),
+			  _root(nullptr), _buffer(new Buff_t[_MAX_BUFF_SIZE]), _bfsize(0)
 		{
 		}
 
@@ -84,33 +85,29 @@ namespace lyf
 			this->reset();
 			delete this->_Unit2BitSet;
 			delete this->_Unit2Node;
+			delete[] this->_buffer;
 		}
 
 		virtual void getData(void *pdata, size_t nBytes) override
 		{
-			auto size = nBytes / sizeof Unit;
-			Unit *p = reinterpret_cast<Unit*>(pdata);
-			for (size_t i = 0; i != size; i++)
+			if (_isGenerated)
+				throw std::runtime_error("The tree has been generated");
+			char *p = reinterpret_cast<char*>(pdata);
+			while (nBytes)
 			{
-				auto v = p[i];
-				if (_Unit2Node->count(v))
-					(*_Unit2Node)[v]->freq++;
-				else
-					(*_Unit2Node)[v] = new Node(v);
-			}
-			auto rest = nBytes - size * sizeof Unit;
-			if (rest)
-			{
-				auto v = p[size] & ~((~static_cast<Unit>(0))>>rest);
-				if (_Unit2Node->count(v))
-					(*_Unit2Node)[v]->freq++;
-				else
-					(*_Unit2Node)[v] = new Node(v);
+				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _bfsize);
+				memcpy(_buffer + _bfsize, p, nw);
+				p += nw;
+				_bfsize += nw;
+				if (_bfsize >= _MAX_BUFF_SIZE)
+					flush();
+				nBytes -= nw;
 			}
 		}
 
 		virtual void generate() override
 		{
+			this->flush();
 			auto heap = lyf::newMinPriorityQueue<Node*>([](auto e) { return e->freq; });
 			for (auto it = _Unit2Node->begin(); it != _Unit2Node->end(); it++)
 			{
@@ -139,10 +136,13 @@ namespace lyf
 			{
 				_genBitSet(_root, new BitSet());
 			}
+			_isGenerated = true;
 		}
 
 		virtual const BitSet *getCode(Unit data) const override
 		{
+			if (!_isGenerated)
+				throw std::runtime_error("Must call generate() before getCode()");
 			auto &bs = *_Unit2BitSet;
 			return bs.count(data) ? bs[data] : nullptr;
 		}
@@ -155,6 +155,32 @@ namespace lyf
 			_root = nullptr;
 			_Unit2Node->clear();
 			_Unit2BitSet->clear();
+			_bfsize = 0;
+			_isGenerated = false;
+		}
+
+		void flush()
+		{
+			auto size = _bfsize / sizeof Unit;
+			Unit *p = reinterpret_cast<Unit*>(_buffer);
+			for (size_t i = 0; i != size; i++)
+			{
+				auto v = p[i];
+				if (_Unit2Node->count(v))
+					(*_Unit2Node)[v]->freq++;
+				else
+					(*_Unit2Node)[v] = new Node(v);
+			}
+			auto rest = _bfsize - size * sizeof Unit;
+			if (rest)
+			{
+				auto v = p[size] & ~((~static_cast<Unit>(0)) >> rest);
+				if (_Unit2Node->count(v))
+					(*_Unit2Node)[v]->freq++;
+				else
+					(*_Unit2Node)[v] = new Node(v);
+			}
+			_bfsize = 0;
 		}
 
 		void showCode(size_t n = 0)
@@ -174,9 +200,13 @@ namespace lyf
 		}
 
 	private:
+		inline static const size_t _MAX_BUFF_SIZE = 1024;
 		NMap *_Unit2Node;
 		BMap *_Unit2BitSet;
 		Node *_root;
+		Buff_t *_buffer;
+		size_t _bfsize;
+		bool _isGenerated;
 
 		void _genBitSet(Node *np, BitSet *bp)
 		{
@@ -234,6 +264,8 @@ namespace lyf
 		void compress(string file, uint8_t level = 9)
 		{
 			std::ifstream inf(file, std::ifstream::binary);
+			if (!inf)
+				throw std::runtime_error("The file does not exist.");
 			inf.seekg(0, std::ifstream::end);
 			size_t fsize = inf.tellg();
 			inf.seekg(0);
