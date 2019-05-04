@@ -21,65 +21,51 @@ namespace lyf
 		virtual const BitSet *getCode(Unit data) const = 0;
 	};
 
-	template<typename Unit>
-	class HuffmanTree;
-
-	template<typename Valt>
-	class _HuffmanNode
-	{
-		friend class HuffmanTree<Valt>;
-
-		using freq_t = uint64_t;
-
-		_HuffmanNode()
-			: vp(nullptr), freq(1)
-		{
-		}
-
-		explicit _HuffmanNode(const Valt &value)
-			: vp(new Valt(value)), freq(1)
-		{
-		}
-
-		_HuffmanNode(const Valt &value, size_t freq)
-			: vp(new Valt(value)), freq(freq)
-		{
-		}
-
-		~_HuffmanNode()
-		{
-			delete vp;
-		}
-
-		void inc()
-		{
-			freq++;
-		}
-
-		void dec()
-		{
-			freq--;
-		}
-
-		bool hasValue() const
-		{
-			return vp != nullptr;
-		}
-
-		Valt value() const
-		{
-			return *vp;
-		}
-
-		const Valt * const vp;
-		freq_t freq = 1;
-		_HuffmanNode *left = nullptr;
-		_HuffmanNode *right = nullptr;
-	};
 
 	template<typename Unit>
 	class HuffmanTree : public ZEncoderInterface<Unit>
 	{
+	private:
+		struct _HuffmanNode
+		{
+			using freq_t = uint64_t;
+
+			_HuffmanNode()
+				: vp(nullptr), freq(1)
+			{
+			}
+
+			explicit _HuffmanNode(const Unit &value)
+				: vp(new Unit(value)), freq(1)
+			{
+			}
+
+			_HuffmanNode(const Unit &value, size_t freq)
+				: vp(new Unit(value)), freq(freq)
+			{
+			}
+
+			~_HuffmanNode()
+			{
+				delete vp;
+			}
+
+			bool hasValue() const
+			{
+				return vp != nullptr;
+			}
+
+			Unit value() const
+			{
+				return *vp;
+			}
+
+			const Unit * const vp;
+			freq_t freq = 1;
+			_HuffmanNode *left = nullptr;
+			_HuffmanNode *right = nullptr;
+		};
+
 	public:
 		using _MyBase = ZEncoderInterface<Unit>;
 		using BitSet = typename _MyBase::BitSet;
@@ -88,15 +74,17 @@ namespace lyf
 		using BMap = std::unordered_map<Unit, BitSet*>;
 
 		HuffmanTree()
-			: _Unit2Node(NMap()), _Unit2BitSet(BMap()), _root(nullptr)
+			: _Unit2Node(new NMap()), _Unit2BitSet(new BMap()), _root(nullptr)
 		{
 		}
 
 		~HuffmanTree()
 		{
-			for (auto it = _Unit2BitSet.begin(); it != _Unit2BitSet.end(); it++)
+			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end(); it++)
 				delete it->second;
 			this->_deleteTree(this->_root);
+			delete this->_Unit2BitSet;
+			delete this->_Unit2Node;
 		}
 
 		virtual void getData(void *pdata, size_t nBytes) override
@@ -106,31 +94,31 @@ namespace lyf
 			for (size_t i = 0; i != size; i++)
 			{
 				auto v = p[i];
-				if (_Unit2Node.count(v))
-					_Unit2Node[v]->inc();
+				if (_Unit2Node->count(v))
+					(*_Unit2Node)[v]->freq++;
 				else
-					_Unit2Node[v] = new Node(v);
+					(*_Unit2Node)[v] = new Node(v);
 			}
 			auto rest = nBytes - size * sizeof Unit;
 			if (rest)
 			{
 				auto v = p[size] & ~((~static_cast<Unit>(0))>>rest);
-				if (_Unit2Node.count(v))
-					_Unit2Node[v]->inc();
+				if (_Unit2Node->count(v))
+					(*_Unit2Node)[v]->freq++;
 				else
-					_Unit2Node[v] = new Node(v);
+					(*_Unit2Node)[v] = new Node(v);
 			}
 		}
 
 		virtual void generate() override
 		{
 			auto heap = lyf::newMinPriorityQueue<Node*>([](auto e) { return e->freq; });
-			for (auto it = _Unit2Node.begin(); it != _Unit2Node.end(); it++)
+			for (auto it = _Unit2Node->begin(); it != _Unit2Node->end(); it++)
 			{
 				heap.insert(it->second);
-				this->_Unit2BitSet[it->first] = new BitSet();
+				(*_Unit2BitSet)[it->first] = new BitSet();
 			}
-			size_t n = _Unit2Node.size() - 1;
+			size_t n = _Unit2Node->size() - 1;
 			for (size_t i = 0; i < n; i++)
 			{
 				auto np = new Node();
@@ -140,11 +128,11 @@ namespace lyf
 				heap.insert(np);
 			}
 			_root = heap.pop();
-			if (_Unit2Node.size() == 1)
+			if (_Unit2Node->size() == 1)
 			{
-				for (auto it = _Unit2Node.begin(); it != _Unit2Node.end(); it++)
+				for (auto it = _Unit2Node->begin(); it != _Unit2Node->end(); it++)
 				{
-					_Unit2BitSet[it->first] = new BitSet{ 0 };
+					(*_Unit2BitSet)[it->first] = new BitSet{ 0 };
 					break;
 				}
 			}
@@ -156,12 +144,12 @@ namespace lyf
 
 		virtual const BitSet *getCode(Unit data) const override
 		{
-			return this->_Unit2BitSet[data];
+			return (*_Unit2BitSet)[data];
 		}
 
 	private:
-		NMap _Unit2Node;
-		BMap _Unit2BitSet;
+		NMap *_Unit2Node;
+		BMap *_Unit2BitSet;
 		Node *_root;
 
 		void _genBitSet(Node *np, BitSet *bp)
@@ -170,7 +158,7 @@ namespace lyf
 			{
 				if (np->hasValue())
 				{
-					_Unit2BitSet[np->value()] = bp;
+					(*_Unit2BitSet)[np->value()] = bp;
 					break;
 				}
 				else
@@ -218,7 +206,7 @@ namespace lyf
 		double compressRate();
 
 	private:
-		static const double _NoDeepFactor = 0.95;
+		inline static const double _NoDeepFactor = 0.95;
 	};
 
 	using HuffmanCompresser = ZCompresser<HuffmanTree<uint16_t>>;
