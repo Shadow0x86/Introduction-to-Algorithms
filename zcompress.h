@@ -19,6 +19,7 @@ namespace lyf
 		virtual void getData(void *pdata, size_t size) = 0;
 		virtual void generate() = 0;
 		virtual const BitSet *getCode(Unit data) const = 0;
+		virtual void reset() = 0;
 	};
 
 
@@ -80,9 +81,7 @@ namespace lyf
 
 		~HuffmanTree()
 		{
-			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end(); it++)
-				delete it->second;
-			this->_deleteTree(this->_root);
+			this->reset();
 			delete this->_Unit2BitSet;
 			delete this->_Unit2Node;
 		}
@@ -148,6 +147,16 @@ namespace lyf
 			return bs.count(data) ? bs[data] : nullptr;
 		}
 
+		virtual void reset() override
+		{
+			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end(); it++)
+				delete it->second;
+			_deleteTree(_root);
+			_root = nullptr;
+			_Unit2Node->clear();
+			_Unit2BitSet->clear();
+		}
+
 		void showCode(size_t n = 0)
 		{
 			if (!n)
@@ -156,7 +165,7 @@ namespace lyf
 			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end() && k != n; it++, k++)
 			{
 				cout << it->first << ": ";
-				for (auto i = it->second->begin(); i != it->second->end(); i++)
+				for (auto i = it->second->begin(), end = it->second->end(); i != end; i++)
 				{
 					cout << *i;
 				}
@@ -217,13 +226,35 @@ namespace lyf
 	class ZCompresser : public _BaseZCompresser
 	{
 	public:
-		ZCompresser() {}
+		ZCompresser()
+			: _encoder(Encoder())
+		{
+		}
 
-		void compress(string file, uint8_t level = 9);
-		double compressRate();
+		void compress(string file, uint8_t level = 9)
+		{
+			std::ifstream inf(file, std::ifstream::binary);
+			inf.seekg(0, std::ifstream::end);
+			size_t fsize = inf.tellg();
+			inf.seekg(0);
+			size_t bfsize = 1024;
+			char *buffer = new char[bfsize];
+			size_t cnt = fsize / bfsize;
+			for (size_t i = 0; i != cnt; i++)
+			{
+				inf.read(buffer, bfsize);
+				_encoder.getData(buffer, bfsize);
+			}
+			size_t rest = fsize - cnt * bfsize;
+			inf.read(buffer, rest);
+			_encoder.getData(buffer, rest);
+			inf.close();
+			_encoder.generate();
+		}
 
 	private:
-		inline static const double _NoDeepFactor = 0.99;
+		inline static const double _NoDeepFactor = 0.98;
+		Encoder _encoder;
 	};
 
 	using HuffmanCompresser = ZCompresser<HuffmanTree<uint16_t>>;
