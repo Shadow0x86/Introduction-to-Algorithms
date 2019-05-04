@@ -16,11 +16,11 @@ namespace lyf
 		using BitSet = std::vector<bool>;
 
 		virtual void getData(void *pdata, size_t size) = 0;
-		virtual void getData(std::function<size_t(void*, size_t)> read) = 0;
 		virtual void generate() = 0;
 		virtual const BitSet *getCode(Unit data) const = 0;
 		virtual void updateLevel() = 0;
 		virtual string getHeader() const = 0;
+		virtual double compressionRatio() const = 0;
 	};
 
 
@@ -128,18 +128,6 @@ namespace lyf
 			}
 		}
 
-		virtual void getData(std::function<size_t(void*, size_t)> read) override
-		{
-			this->_ensureNotGenerated();
-			size_t nRead = read(_buffer + _bfsize, _MAX_BUFF_SIZE - _bfsize);
-			while (nRead)
-			{
-				_bfsize += nRead;
-				_flush();
-				nRead = read(_buffer, _MAX_BUFF_SIZE);
-			}
-		}
-
 		virtual void generate() override
 		{
 			this->_ensureNotGenerated();
@@ -196,12 +184,19 @@ namespace lyf
 			return this->_header.getString(this->_Unit2BitSet);
 		}
 
+		virtual double compressionRatio() const
+		{
+			this->_ensureGenerated();
+			// TODO
+			return 1;
+		}
+
 		uint8_t level() const
 		{
 			return this->_header.level;
 		}
 
-		void showCode(size_t n = 0)
+		void showCodes(size_t n = 0)
 		{
 			this->_ensureGenerated();
 			if (!n)
@@ -221,7 +216,7 @@ namespace lyf
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
 
 	private:
-		inline static const size_t _MAX_BUFF_SIZE = 1024;
+		inline static const size_t _MAX_BUFF_SIZE = 4096;
 		NMap *_Unit2Node;
 		BMap *_Unit2BitSet;
 		Node *_root;
@@ -249,19 +244,19 @@ namespace lyf
 			for (size_t i = 0; i != size; i++)
 			{
 				auto v = p[i];
-				if (_Unit2Node->count(v))
-					(*_Unit2Node)[v]->freq++;
-				else
+				if (_Unit2Node->find(v) == _Unit2Node->end())
 					(*_Unit2Node)[v] = new Node(v);
+				else
+					(*_Unit2Node)[v]->freq++;
 			}
 			auto rest = _bfsize - size * sizeof Unit;
 			if (rest)
 			{
 				auto v = p[size] & ~((~static_cast<Unit>(0)) >> rest);
-				if (_Unit2Node->count(v))
-					(*_Unit2Node)[v]->freq++;
-				else
+				if (_Unit2Node->find(v) == _Unit2Node->end())
 					(*_Unit2Node)[v] = new Node(v);
+				else
+					(*_Unit2Node)[v]->freq++;
 			}
 			_bfsize = 0;
 		}
@@ -337,20 +332,24 @@ namespace lyf
 			std::ifstream inf(file, std::ifstream::binary);
 			if (!inf)
 				throw std::runtime_error("The file does not exist.");
-			inf.seekg(0, std::ifstream::end);
-			size_t rest = inf.tellg();
-			inf.seekg(0);
 
-			auto readFile = [&](void *bf, size_t nBytes) -> size_t
+			inf.seekg(0, std::ifstream::end);
+			size_t fsize = inf.tellg();
+			inf.seekg(0);
+			const size_t bfsize = 4096;
+			std::unique_ptr<char[]> buffer(new char[bfsize]);
+			const size_t cnt = fsize / bfsize;
+			for (size_t i = 0; i != cnt; i++)
 			{
-				size_t nr = std::min(rest, nBytes);
-				inf.read(reinterpret_cast<char*>(bf), nr);
-				rest -= nr;
-				return nr;
-			};
-			_encoder.getData(readFile);
+				inf.read(buffer.get(), bfsize);
+				_encoder.getData(buffer.get(), bfsize);
+			}
+			size_t rest = fsize - cnt * bfsize;
+			inf.read(buffer.get(), rest);
+			_encoder.getData(buffer.get(), rest);
+			inf.close();
 			_encoder.generate();
-			_encoder.showCode(100);
+			//_encoder.showCodes(100);
 
 		}
 
