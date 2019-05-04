@@ -16,14 +16,16 @@ namespace lyf
 		using BitSet = std::vector<bool>;
 
 		virtual void getData(void *pdata, size_t size) = 0;
+		virtual void getData(std::function<size_t(void*, size_t)> read) = 0;
 		virtual void generate() = 0;
 		virtual const BitSet *getCode(Unit data) const = 0;
-		virtual void reset() = 0;
+		virtual void updateLevel() = 0;
+		virtual string getHeader() const = 0;
 	};
 
 
 	template<typename Unit>
-	class HuffmanTree : public ZEncoderInterface<Unit>
+	class HuffmanEncoder : public ZEncoderInterface<Unit>
 	{
 	private:
 		struct _HuffmanNode
@@ -74,15 +76,37 @@ namespace lyf
 		using BMap = std::unordered_map<Unit, BitSet*>;
 		using Buff_t = char;
 
-		HuffmanTree()
-			: _Unit2Node(new NMap()), _Unit2BitSet(new BMap()), _isGenerated(false),
+	private:
+		struct Header
+		{
+			Header(uint8_t level, uint8_t nDataUnitBytes)
+				: level(level), nDataUnitBytes(nDataUnitBytes)
+			{
+			}
+
+			uint16_t nHeaderTotalBytes;
+			uint8_t level;
+			uint8_t nDataFillBytes;
+			const uint8_t nDataUnitBytes;
+
+			string getString(const BMap *bmap) const
+			{
+				// TOTO
+				return "";
+			}
+		};
+
+	public:
+		HuffmanEncoder()
+			: _Unit2Node(new NMap()), _Unit2BitSet(new BMap()),
+			  _isGenerated(false), _header(Header(1, sizeof Unit)),
 			  _root(nullptr), _buffer(new Buff_t[_MAX_BUFF_SIZE]), _bfsize(0)
 		{
 		}
 
-		~HuffmanTree()
+		~HuffmanEncoder()
 		{
-			this->reset();
+			this->_reset();
 			delete this->_Unit2BitSet;
 			delete this->_Unit2Node;
 			delete[] this->_buffer;
@@ -90,8 +114,7 @@ namespace lyf
 
 		virtual void getData(void *pdata, size_t nBytes) override
 		{
-			if (_isGenerated)
-				throw std::runtime_error("The tree has been generated");
+			this->_ensureNotGenerated();
 			char *p = reinterpret_cast<char*>(pdata);
 			while (nBytes)
 			{
@@ -100,14 +123,27 @@ namespace lyf
 				p += nw;
 				_bfsize += nw;
 				if (_bfsize >= _MAX_BUFF_SIZE)
-					flush();
+					_flush();
 				nBytes -= nw;
+			}
+		}
+
+		virtual void getData(std::function<size_t(void*, size_t)> read) override
+		{
+			this->_ensureNotGenerated();
+			size_t nRead = read(_buffer + _bfsize, _MAX_BUFF_SIZE - _bfsize);
+			while (nRead)
+			{
+				_bfsize += nRead;
+				_flush();
+				nRead = read(_buffer, _MAX_BUFF_SIZE);
 			}
 		}
 
 		virtual void generate() override
 		{
-			this->flush();
+			this->_ensureNotGenerated();
+			this->_flush();
 			auto heap = lyf::newMinPriorityQueue<Node*>([](auto e) { return e->freq; });
 			for (auto it = _Unit2Node->begin(); it != _Unit2Node->end(); it++)
 			{
@@ -141,25 +177,72 @@ namespace lyf
 
 		virtual const BitSet *getCode(Unit data) const override
 		{
-			if (!_isGenerated)
-				throw std::runtime_error("Must call generate() before getCode()");
+			this->_ensureGenerated();
 			auto &bs = *_Unit2BitSet;
 			return bs.count(data) ? bs[data] : nullptr;
 		}
 
-		virtual void reset() override
+		virtual void updateLevel() override
 		{
-			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end(); it++)
-				delete it->second;
-			_deleteTree(_root);
-			_root = nullptr;
-			_Unit2Node->clear();
-			_Unit2BitSet->clear();
-			_bfsize = 0;
-			_isGenerated = false;
+			if (this->_header.level >= MAX_COMPRESSION_LEVEL)
+				throw std::runtime_error("The compression level has reached the highest.");
+			this->_reset();
+			this->_header.level++;
 		}
 
-		void flush()
+		virtual string getHeader() const override
+		{
+			this->_ensureGenerated();
+			return this->_header.getString(this->_Unit2BitSet);
+		}
+
+		uint8_t level() const
+		{
+			return this->_header.level;
+		}
+
+		void showCode(size_t n = 0)
+		{
+			this->_ensureGenerated();
+			if (!n)
+				n = _Unit2BitSet->size();
+			size_t k = 0;
+			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end() && k != n; it++, k++)
+			{
+				cout << it->first << ": ";
+				for (auto i = it->second->begin(), end = it->second->end(); i != end; i++)
+				{
+					cout << *i;
+				}
+				cout << endl;
+			}
+		}
+
+		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
+
+	private:
+		inline static const size_t _MAX_BUFF_SIZE = 1024;
+		NMap *_Unit2Node;
+		BMap *_Unit2BitSet;
+		Node *_root;
+		Buff_t *_buffer;
+		size_t _bfsize;
+		Header _header;
+		bool _isGenerated;
+
+		void _ensureGenerated() const
+		{
+			if (!_isGenerated)
+				throw std::runtime_error("Must call generate() first!");
+		}
+
+		void _ensureNotGenerated() const
+		{
+			if (_isGenerated)
+				throw std::runtime_error("The code has been generated. Call updateLevel() to reset it.");
+		}
+
+		void _flush()
 		{
 			auto size = _bfsize / sizeof Unit;
 			Unit *p = reinterpret_cast<Unit*>(_buffer);
@@ -183,30 +266,17 @@ namespace lyf
 			_bfsize = 0;
 		}
 
-		void showCode(size_t n = 0)
+		void _reset()
 		{
-			if (!n)
-				n = _Unit2BitSet->size();
-			size_t k = 0;
-			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end() && k != n; it++, k++)
-			{
-				cout << it->first << ": ";
-				for (auto i = it->second->begin(), end = it->second->end(); i != end; i++)
-				{
-					cout << *i;
-				}
-				cout << endl;
-			}
+			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end(); it++)
+				delete it->second;
+			_deleteTree(_root);
+			_root = nullptr;
+			_Unit2Node->clear();
+			_Unit2BitSet->clear();
+			_bfsize = 0;
+			_isGenerated = false;
 		}
-
-	private:
-		inline static const size_t _MAX_BUFF_SIZE = 1024;
-		NMap *_Unit2Node;
-		BMap *_Unit2BitSet;
-		Node *_root;
-		Buff_t *_buffer;
-		size_t _bfsize;
-		bool _isGenerated;
 
 		void _genBitSet(Node *np, BitSet *bp)
 		{
@@ -244,7 +314,7 @@ namespace lyf
 	class _BaseZCompresser
 	{
 	public:
-		using BitSet = std::vector<bool>;
+		
 	private:
 		static const char * const _FilenameSuffix;
 	};
@@ -256,8 +326,9 @@ namespace lyf
 	class ZCompresser : public _BaseZCompresser
 	{
 	public:
-		ZCompresser()
-			: _encoder(Encoder())
+		template<typename... Types>
+		ZCompresser(Types&&... args)
+			: _encoder(std::forward<Types>(args)...)
 		{
 		}
 
@@ -267,21 +338,20 @@ namespace lyf
 			if (!inf)
 				throw std::runtime_error("The file does not exist.");
 			inf.seekg(0, std::ifstream::end);
-			size_t fsize = inf.tellg();
+			size_t rest = inf.tellg();
 			inf.seekg(0);
-			size_t bfsize = 1024;
-			char *buffer = new char[bfsize];
-			size_t cnt = fsize / bfsize;
-			for (size_t i = 0; i != cnt; i++)
+
+			auto readFile = [&](void *bf, size_t nBytes) -> size_t
 			{
-				inf.read(buffer, bfsize);
-				_encoder.getData(buffer, bfsize);
-			}
-			size_t rest = fsize - cnt * bfsize;
-			inf.read(buffer, rest);
-			_encoder.getData(buffer, rest);
-			inf.close();
+				size_t nr = std::min(rest, nBytes);
+				inf.read(reinterpret_cast<char*>(bf), nr);
+				rest -= nr;
+				return nr;
+			};
+			_encoder.getData(readFile);
 			_encoder.generate();
+			_encoder.showCode(100);
+
 		}
 
 	private:
@@ -289,7 +359,7 @@ namespace lyf
 		Encoder _encoder;
 	};
 
-	using HuffmanCompresser = ZCompresser<HuffmanTree<uint16_t>>;
+	using HuffmanCompresser = ZCompresser<HuffmanEncoder<uint16_t>>;
 
 
 	class ZDecompresser : public _BaseZCompresser
