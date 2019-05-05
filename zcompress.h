@@ -17,8 +17,8 @@ namespace lyf
 
 		virtual void getData(void *, size_t) = 0;
 		virtual void generate() = 0;
-		virtual const BitSet &getCode(Unit) const = 0;
-		virtual void updateLevel() = 0;
+		virtual BitSet getCode(Unit) const = 0;
+		virtual void reset() = 0;
 		virtual string getHeader() const = 0;
 		virtual double CompressionRate() const = 0;
 		virtual bool isGenerated() const = 0;
@@ -70,30 +70,10 @@ namespace lyf
 		using BMap = std::unordered_map<Unit, std::unique_ptr<BitSet>>;
 		using Buff_t = char;
 
-	private:
-		struct Header
-		{
-			Header(uint8_t level, uint8_t nDataUnitBytes)
-				: level(level), nDataUnitBytes(nDataUnitBytes)
-			{
-			}
-
-			uint16_t nHeaderTotalBytes;
-			uint8_t level;
-			uint8_t nDataFillBytes;
-			const uint8_t nDataUnitBytes;
-
-			string getString(const BMap &bmap) const
-			{
-				// TOTO
-				return "";
-			}
-		};
-
 	public:
 		HuffmanEncoder()
 			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _FileTotalSize(0),
-			  _isGenerated(false), _header(Header(1, sizeof Unit)), _CompressionRate(-1),
+			  _isGenerated(false), _nDataFillBytes(0), _CompressionRate(-1), _pHeader(nullptr),
 			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
@@ -150,24 +130,53 @@ namespace lyf
 			_isGenerated = true;
 		}
 
-		virtual const BitSet &getCode(Unit data) const override
+		virtual BitSet getCode(Unit data) const override
 		{
 			this->_ensureGenerated();
 			return *((*_pUnit2BitSet)[data]);
 		}
 
-		virtual void updateLevel() override
-		{
-			if (this->_header.level >= MAX_COMPRESSION_LEVEL)
-				throw std::runtime_error("The compression level has reached the highest.");
-			this->_reset();
-			this->_header.level++;
-		}
-
 		virtual string getHeader() const override
 		{
+			return const_cast<HuffmanEncoder*>(this)->getHeader();
+		}
+
+		string getHeader()
+		{
 			this->_ensureGenerated();
-			return this->_header.getString(*_pUnit2BitSet);
+			if (!this->_pHeader)
+			{
+				this->_pHeader.reset(new string);
+				this->_pHeader->push_back(_nDataFillBytes);
+				char nDataUnitBytes = sizeof Unit;
+				this->_pHeader->push_back(nDataUnitBytes);
+				for (auto it = _pUnit2BitSet->begin(); it != _pUnit2BitSet->end(); it++)
+				{
+					size_t nCodeBits = it->second->size();
+					for (char i = 0; i != nDataUnitBytes; i++)
+					{
+						char c = nCodeBits >> ((nDataUnitBytes - 1 - i) * 8);
+						this->_pHeader->push_back(c);
+					}
+					char pos = 0, c = 0;
+					for (auto i = it->second->begin(); i != it->second->end(); i++)
+					{
+						c += ((*i) << (7 - pos));
+						if (++pos == 8)
+						{
+							pos = 0;
+							this->_pHeader->push_back(c);
+							c = 0;
+						}
+					}
+					if (pos)
+						this->_pHeader->push_back(c);
+					auto cp = reinterpret_cast<const char*>(&(it->first));
+					for (char i = 0; i != sizeof Unit; i++)
+						this->_pHeader->push_back(cp[i]);
+				}
+			}
+			return *(this->_pHeader);
 		}
 
 		virtual double CompressionRate() const override
@@ -195,9 +204,17 @@ namespace lyf
 			return this->_isGenerated;
 		}
 
-		uint8_t level() const
+		virtual void reset() override
 		{
-			return this->_header.level;
+			_pRoot = nullptr;
+			_pUnit2Node->clear();
+			_pUnit2BitSet->clear();
+			_BuffSize = 0;
+			_pHeader.reset();
+			_nDataFillBytes = 0;
+			_FileTotalSize = 0;
+			_CompressionRate = -1;
+			_isGenerated = false;
 		}
 
 		void showCodes(size_t n = 0)
@@ -217,8 +234,6 @@ namespace lyf
 			}
 		}
 
-		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
-
 	private:
 		inline static const size_t _MAX_BUFF_SIZE = 4096;
 		std::unique_ptr<NMap> _pUnit2Node;
@@ -226,7 +241,8 @@ namespace lyf
 		std::shared_ptr<Node> _pRoot;
 		std::unique_ptr<Buff_t[]> _pBuffer;
 		size_t _BuffSize;
-		Header _header;
+		std::unique_ptr<string> _pHeader;
+		char _nDataFillBytes;
 		uint64_t _FileTotalSize;
 		double _CompressionRate;
 		bool _isGenerated;
@@ -240,7 +256,7 @@ namespace lyf
 		void _ensureNotGenerated() const
 		{
 			if (_isGenerated)
-				throw std::runtime_error("The encoder has been generated. Call updateLevel() to reset it.");
+				throw std::runtime_error("The encoder has been generated. Call reset() to reset it.");
 		}
 
 		void _flush()
@@ -269,20 +285,10 @@ namespace lyf
 					(*_pUnit2Node)[v].reset(new Node(v));
 				else
 					(*_pUnit2Node)[v]->freq++;
+				_nDataFillBytes = sizeof Unit - rest;
 			}
 			_FileTotalSize += _BuffSize;
 			_BuffSize = 0;
-		}
-
-		void _reset()
-		{
-			_pRoot = nullptr;
-			_pUnit2Node->clear();
-			_pUnit2BitSet->clear();
-			_BuffSize = 0;
-			_FileTotalSize = 0;
-			_CompressionRate = -1;
-			_isGenerated = false;
 		}
 
 		void _genBitSet(std::shared_ptr<Node> np, BitSet *bp)
@@ -322,9 +328,9 @@ namespace lyf
 	class ZCompresser : public _BaseZCompresser
 	{
 	public:
-		template<typename... Types>
-		ZCompresser(Types&&... args)
-			: _encoder(std::forward<Types>(args)...)
+		template<typename... EncoderArgs>
+		ZCompresser(EncoderArgs&&... args)
+			: _pEncoder(new Encoder(std::forward<EncoderArgs>(args)...))
 		{
 		}
 
@@ -343,21 +349,26 @@ namespace lyf
 			for (size_t i = 0; i != cnt; i++)
 			{
 				inf.read(buffer.get(), bfsize);
-				_encoder.getData(buffer.get(), bfsize);
+				_pEncoder->getData(buffer.get(), bfsize);
 			}
 			size_t rest = fsize - cnt * bfsize;
 			inf.read(buffer.get(), rest);
-			_encoder.getData(buffer.get(), rest);
+			_pEncoder->getData(buffer.get(), rest);
 			inf.close();
-			_encoder.generate();
-			_encoder.showCodes();
-			cout << _encoder.CompressionRate() << endl;
+			_pEncoder->generate();
+			_pEncoder->showCodes(100);
+			cout << _pEncoder->CompressionRate() << endl;
+			
+			string header = _pEncoder->getHeader();
+			cout << header.size() << endl;
 
 		}
 
+		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
+
 	private:
 		inline static const double _NoDeepFactor = 0.98;
-		Encoder _encoder;
+		std::unique_ptr<Encoder> _pEncoder;
 	};
 
 	using HuffmanCompresser = ZCompresser<HuffmanEncoder<uint16_t>>;
