@@ -84,7 +84,7 @@ namespace lyf
 		}
 		INLINE Iter left(const Iter it) const
 		{
-#if DEBUG
+#if _DEBUG
 			if ((it - begin) * 2 + 1 > size())
 				return end;
 #endif
@@ -92,7 +92,7 @@ namespace lyf
 		}
 		INLINE Iter right(const Iter it) const
 		{
-#if DEBUG
+#if _DEBUG
 			if ((it - begin) * 2 + 2 > size())
 				return end;
 #endif

@@ -283,7 +283,7 @@ namespace lyf
 
 		value_type &operator[](size_t index)
 		{
-#if DEBUG
+#if _DEBUG
 			if (index >= _size)
 				throw std::runtime_error("index out of range");
 #endif

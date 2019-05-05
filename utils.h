@@ -4,11 +4,11 @@
 #include <string>
 #include <chrono>
 #include <utility>
+#include <random>
 
 
 #define INLINE inline
 #define MOVE std::move
-#define DEBUG 1
 //#define LOG_CONST_ASSIGN
 
 
@@ -33,7 +33,7 @@ namespace lyf
 	template<typename Iter>
 	INLINE void _ensureValidRange(Iter begin, Iter end)
 	{
-#if DEBUG
+#if _DEBUG
 		assert(begin < end);
 #endif
 	}
@@ -98,7 +98,7 @@ namespace lyf
 
 		ReversePtr(const ReversePtr &rhs)
 			:
-#if DEBUG
+#if _DEBUG
 			_rbegin(rhs._rbegin), _rend(rhs._rend), 
 #endif
 			current(rhs.current)
@@ -107,7 +107,7 @@ namespace lyf
 		}
 		INLINE ReversePtr &operator=(const ReversePtr &rhs)
 		{
-#if DEBUG
+#if _DEBUG
 			_rbegin = rhs._rbegin;
 			_rend = rhs._rend;
 #endif
@@ -197,7 +197,7 @@ namespace lyf
 		}
 		INLINE reference_type operator[](size_t i) const
 		{
-#if DEBUG
+#if _DEBUG
 			assert(current - i <= _rbegin && current - i > _rend);
 #endif
 			return *(current - i);
@@ -205,7 +205,7 @@ namespace lyf
 	protected:
 		ReversePtr() {}
 		ReversePtr(T *begin, T *end)
-#if DEBUG
+#if _DEBUG
 			: _rbegin(end - 1), _rend(begin - 1)
 #endif
 		{
@@ -213,19 +213,19 @@ namespace lyf
 
 		INLINE void _ensureValidCurrent() const
 		{
-#if DEBUG
+#if _DEBUG
 			assert(_rbegin >= current && current >= _rend);
 #endif
 		}
 		INLINE void _ensureDerefCurrent() const
 		{
-#if DEBUG
+#if _DEBUG
 			assert(_rbegin >= current && current > _rend);
 #endif
 		}
 
 		value_type* current = nullptr;
-#if DEBUG
+#if _DEBUG
 		value_type* _rbegin = nullptr;
 		value_type* _rend = nullptr;
 #endif
@@ -591,14 +591,14 @@ namespace lyf
 		_CheckedNode() {}
 
 		_CheckedNode(void *pCont)
-#if DEBUG
+#if _DEBUG
 			:_pCont(pCont)
 #endif
 		{
 		}
 
 		_CheckedNode(const _CheckedNode &rhs)
-#if DEBUG
+#if _DEBUG
 			:_pCont()
 #endif
 		{
@@ -611,27 +611,27 @@ namespace lyf
 
 		void _setCont(void *pCont = nullptr)
 		{
-#if DEBUG
+#if _DEBUG
 			_pCont = pCont;
 #endif
 		}
 		void _ensureInCont() const
 		{
-#if DEBUG
+#if _DEBUG
 			if (!_pCont)
 				throw std::runtime_error("The node is outside range!");
 #endif
 		}
 		void _ensureInCont(const void *pCont) const
 		{
-#if DEBUG
+#if _DEBUG
 			if (_pCont != pCont)
 				throw std::runtime_error("The node is outside range!");
 #endif
 		}
 
 	private:
-#if DEBUG
+#if _DEBUG
 		void *_pCont = nullptr;
 #endif
 
@@ -642,7 +642,7 @@ namespace lyf
 	class _CheckedNodeContainer
 	{
 	public:
-#if DEBUG
+#if _DEBUG
 		using nodeptr = std::shared_ptr<Node>;
 #else
 		using nodeptr = Node * ;
@@ -650,7 +650,7 @@ namespace lyf
 
 		static nodeptr _new_node(Node *pNode)
 		{
-#if DEBUG
+#if _DEBUG
 			return nodeptr(pNode);
 #else
 			return pNode;
@@ -659,7 +659,7 @@ namespace lyf
 
 		static void _assign_node(nodeptr &ln, Node *pNode)
 		{
-#if DEBUG
+#if _DEBUG
 			ln.reset(pNode);
 #else
 			ln = pNode;
@@ -668,10 +668,10 @@ namespace lyf
 
 		static void _delete_node(nodeptr np)
 		{
-#if DEBUG
+#if _DEBUG
 			np->_reset_neighbors();
 			np->_setCont();
-			np.reset();
+			np._reset();
 #else
 			delete np;
 #endif
