@@ -20,7 +20,7 @@ namespace lyf
 		virtual const BitSet &getCode(Unit data) const = 0;
 		virtual void updateLevel() = 0;
 		virtual string getHeader() const = 0;
-		virtual double compressionRatio() const = 0;
+		virtual double CompressionRate() const = 0;
 	};
 
 
@@ -94,7 +94,7 @@ namespace lyf
 	public:
 		HuffmanEncoder()
 			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()),
-			  _isGenerated(false), _header(Header(1, sizeof Unit)),
+			  _isGenerated(false), _header(Header(1, sizeof Unit)), _CompressionRate(0),
 			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _bfsize(0)
 		{
 		}
@@ -123,7 +123,7 @@ namespace lyf
 			for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
 			{
 				heap.insert(it->second);
-				(*_pUnit2BitSet)[it->first].reset(new BitSet());
+				//(*_pUnit2BitSet)[it->first].reset(new BitSet());
 			}
 			size_t n = _pUnit2Node->size() - 1;
 			for (size_t i = 0; i < n; i++)
@@ -137,11 +137,12 @@ namespace lyf
 			_pRoot = heap.pop();
 			if (_pUnit2Node->size() == 1)
 			{
-				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
-				{
-					(*_pUnit2BitSet)[it->first].reset(new BitSet{ 0 });
-					break;
-				}
+				(*_pUnit2BitSet)[_pRoot->value()].reset(new BitSet{ 0 });;
+				//for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
+				//{
+				//	(*_pUnit2BitSet)[it->first].reset(new BitSet{ 0 });
+				//	break;
+				//}
 			}
 			else
 			{
@@ -170,11 +171,10 @@ namespace lyf
 			return this->_header.getString(*_pUnit2BitSet);
 		}
 
-		virtual double compressionRatio() const
+		virtual double CompressionRate() const
 		{
 			this->_ensureGenerated();
-			// TODO
-			return 1;
+			return this->_CompressionRate;
 		}
 
 		uint8_t level() const
@@ -209,6 +209,7 @@ namespace lyf
 		std::unique_ptr<Buff_t[]> _pBuffer;
 		size_t _bfsize;
 		Header _header;
+		double _CompressionRate;
 		bool _isGenerated;
 
 		void _ensureGenerated() const
@@ -220,7 +221,7 @@ namespace lyf
 		void _ensureNotGenerated() const
 		{
 			if (_isGenerated)
-				throw std::runtime_error("The code has been generated. Call updateLevel() to reset it.");
+				throw std::runtime_error("The encoder has been generated. Call updateLevel() to reset it.");
 		}
 
 		void _flush()
@@ -238,7 +239,13 @@ namespace lyf
 			auto rest = _bfsize - size * sizeof Unit;
 			if (rest)
 			{
-				auto v = p[size] & ~((~static_cast<Unit>(0)) >> rest);
+				char *cp = reinterpret_cast<char*>(p + size);
+				Unit v = 0;
+				for (size_t i = 0; i != rest; i++)
+				{
+					Unit d = cp[i];
+					v += (d << ((sizeof Unit - 1 - i) * 8));
+				}
 				if (_pUnit2Node->find(v) == _pUnit2Node->end())
 					(*_pUnit2Node)[v].reset(new Node(v));
 				else
@@ -321,7 +328,7 @@ namespace lyf
 			_encoder.getData(buffer.get(), rest);
 			inf.close();
 			_encoder.generate();
-			//_encoder.showCodes(100);
+			_encoder.showCodes(100);
 
 		}
 
