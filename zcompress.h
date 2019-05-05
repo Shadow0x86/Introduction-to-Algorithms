@@ -17,7 +17,7 @@ namespace lyf
 
 		virtual void getData(void *pdata, size_t size) = 0;
 		virtual void generate() = 0;
-		virtual const BitSet *getCode(Unit data) const = 0;
+		virtual const BitSet &getCode(Unit data) const = 0;
 		virtual void updateLevel() = 0;
 		virtual string getHeader() const = 0;
 		virtual double compressionRatio() const = 0;
@@ -47,11 +47,6 @@ namespace lyf
 			{
 			}
 
-			~_HuffmanNode()
-			{
-				delete vp;
-			}
-
 			bool hasValue() const
 			{
 				return vp != nullptr;
@@ -62,18 +57,18 @@ namespace lyf
 				return *vp;
 			}
 
-			const Unit * const vp;
+			std::unique_ptr<const Unit> const vp;
 			freq_t freq = 1;
-			_HuffmanNode *left = nullptr;
-			_HuffmanNode *right = nullptr;
+			std::shared_ptr<_HuffmanNode> left = nullptr;
+			std::shared_ptr<_HuffmanNode> right = nullptr;
 		};
 
 	public:
 		using _MyBase = ZEncoderInterface<Unit>;
 		using BitSet = typename _MyBase::BitSet;
 		using Node = _HuffmanNode;
-		using NMap = std::unordered_map<Unit, Node*>;
-		using BMap = std::unordered_map<Unit, BitSet*>;
+		using NMap = std::unordered_map<Unit, std::shared_ptr<Node>>;
+		using BMap = std::unordered_map<Unit, std::unique_ptr<BitSet>>;
 		using Buff_t = char;
 
 	private:
@@ -89,7 +84,7 @@ namespace lyf
 			uint8_t nDataFillBytes;
 			const uint8_t nDataUnitBytes;
 
-			string getString(const BMap *bmap) const
+			string getString(const BMap &bmap) const
 			{
 				// TOTO
 				return "";
@@ -98,18 +93,10 @@ namespace lyf
 
 	public:
 		HuffmanEncoder()
-			: _Unit2Node(new NMap()), _Unit2BitSet(new BMap()),
+			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()),
 			  _isGenerated(false), _header(Header(1, sizeof Unit)),
-			  _root(nullptr), _buffer(new Buff_t[_MAX_BUFF_SIZE]), _bfsize(0)
+			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _bfsize(0)
 		{
-		}
-
-		~HuffmanEncoder()
-		{
-			this->_reset();
-			delete this->_Unit2BitSet;
-			delete this->_Unit2Node;
-			delete[] this->_buffer;
 		}
 
 		virtual void getData(void *pdata, size_t nBytes) override
@@ -119,7 +106,7 @@ namespace lyf
 			while (nBytes)
 			{
 				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _bfsize);
-				memcpy(_buffer + _bfsize, p, nw);
+				memcpy(_pBuffer.get() + _bfsize, p, nw);
 				p += nw;
 				_bfsize += nw;
 				if (_bfsize >= _MAX_BUFF_SIZE)
@@ -132,42 +119,41 @@ namespace lyf
 		{
 			this->_ensureNotGenerated();
 			this->_flush();
-			auto heap = lyf::newMinPriorityQueue<Node*>([](auto e) { return e->freq; });
-			for (auto it = _Unit2Node->begin(); it != _Unit2Node->end(); it++)
+			auto heap = lyf::newMinPriorityQueue<std::shared_ptr<Node>>([](auto e) { return e->freq; });
+			for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
 			{
 				heap.insert(it->second);
-				(*_Unit2BitSet)[it->first] = new BitSet();
+				(*_pUnit2BitSet)[it->first].reset(new BitSet());
 			}
-			size_t n = _Unit2Node->size() - 1;
+			size_t n = _pUnit2Node->size() - 1;
 			for (size_t i = 0; i < n; i++)
 			{
-				auto np = new Node();
+				std::shared_ptr<Node> np(new Node());
 				np->left = heap.pop();
 				np->right = heap.pop();
 				np->freq = np->left->freq + np->right->freq;
 				heap.insert(np);
 			}
-			_root = heap.pop();
-			if (_Unit2Node->size() == 1)
+			_pRoot = heap.pop();
+			if (_pUnit2Node->size() == 1)
 			{
-				for (auto it = _Unit2Node->begin(); it != _Unit2Node->end(); it++)
+				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
 				{
-					(*_Unit2BitSet)[it->first] = new BitSet{ 0 };
+					(*_pUnit2BitSet)[it->first].reset(new BitSet{ 0 });
 					break;
 				}
 			}
 			else
 			{
-				_genBitSet(_root, new BitSet());
+				_genBitSet(_pRoot, new BitSet());
 			}
 			_isGenerated = true;
 		}
 
-		virtual const BitSet *getCode(Unit data) const override
+		virtual const BitSet &getCode(Unit data) const override
 		{
 			this->_ensureGenerated();
-			auto &bs = *_Unit2BitSet;
-			return bs.count(data) ? bs[data] : nullptr;
+			return *((*_pUnit2BitSet)[data]);
 		}
 
 		virtual void updateLevel() override
@@ -181,7 +167,7 @@ namespace lyf
 		virtual string getHeader() const override
 		{
 			this->_ensureGenerated();
-			return this->_header.getString(this->_Unit2BitSet);
+			return this->_header.getString(*_pUnit2BitSet);
 		}
 
 		virtual double compressionRatio() const
@@ -200,9 +186,9 @@ namespace lyf
 		{
 			this->_ensureGenerated();
 			if (!n)
-				n = _Unit2BitSet->size();
+				n = _pUnit2BitSet->size();
 			size_t k = 0;
-			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end() && k != n; it++, k++)
+			for (auto it = _pUnit2BitSet->begin(); it != _pUnit2BitSet->end() && k != n; it++, k++)
 			{
 				cout << it->first << ": ";
 				for (auto i = it->second->begin(), end = it->second->end(); i != end; i++)
@@ -217,10 +203,10 @@ namespace lyf
 
 	private:
 		inline static const size_t _MAX_BUFF_SIZE = 4096;
-		NMap *_Unit2Node;
-		BMap *_Unit2BitSet;
-		Node *_root;
-		Buff_t *_buffer;
+		std::unique_ptr<NMap> _pUnit2Node;
+		std::unique_ptr<BMap> _pUnit2BitSet;
+		std::shared_ptr<Node> _pRoot;
+		std::unique_ptr<Buff_t[]> _pBuffer;
 		size_t _bfsize;
 		Header _header;
 		bool _isGenerated;
@@ -240,46 +226,43 @@ namespace lyf
 		void _flush()
 		{
 			auto size = _bfsize / sizeof Unit;
-			Unit *p = reinterpret_cast<Unit*>(_buffer);
+			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
 			for (size_t i = 0; i != size; i++)
 			{
 				auto v = p[i];
-				if (_Unit2Node->find(v) == _Unit2Node->end())
-					(*_Unit2Node)[v] = new Node(v);
+				if (_pUnit2Node->find(v) == _pUnit2Node->end())
+					(*_pUnit2Node)[v].reset(new Node(v));
 				else
-					(*_Unit2Node)[v]->freq++;
+					(*_pUnit2Node)[v]->freq++;
 			}
 			auto rest = _bfsize - size * sizeof Unit;
 			if (rest)
 			{
 				auto v = p[size] & ~((~static_cast<Unit>(0)) >> rest);
-				if (_Unit2Node->find(v) == _Unit2Node->end())
-					(*_Unit2Node)[v] = new Node(v);
+				if (_pUnit2Node->find(v) == _pUnit2Node->end())
+					(*_pUnit2Node)[v].reset(new Node(v));
 				else
-					(*_Unit2Node)[v]->freq++;
+					(*_pUnit2Node)[v]->freq++;
 			}
 			_bfsize = 0;
 		}
 
 		void _reset()
 		{
-			for (auto it = _Unit2BitSet->begin(); it != _Unit2BitSet->end(); it++)
-				delete it->second;
-			_deleteTree(_root);
-			_root = nullptr;
-			_Unit2Node->clear();
-			_Unit2BitSet->clear();
+			_pRoot = nullptr;
+			_pUnit2Node->clear();
+			_pUnit2BitSet->clear();
 			_bfsize = 0;
 			_isGenerated = false;
 		}
 
-		void _genBitSet(Node *np, BitSet *bp)
+		void _genBitSet(std::shared_ptr<Node> np, BitSet *bp)
 		{
 			while (np)
 			{
 				if (np->hasValue())
 				{
-					(*_Unit2BitSet)[np->value()] = bp;
+					(*_pUnit2BitSet)[np->value()].reset(bp);
 					break;
 				}
 				else
@@ -290,17 +273,6 @@ namespace lyf
 					np = np->right;
 					bp->push_back(1);
 				}
-			}
-		}
-
-		void _deleteTree(Node *np)
-		{
-			while (np)
-			{
-				_deleteTree(np->left);
-				auto r = np->right;
-				delete np;
-				np = r;
 			}
 		}
 	};
