@@ -15,12 +15,13 @@ namespace lyf
 	public:
 		using BitSet = std::vector<bool>;
 
-		virtual void getData(void *pdata, size_t size) = 0;
+		virtual void getData(void *, size_t) = 0;
 		virtual void generate() = 0;
-		virtual const BitSet &getCode(Unit data) const = 0;
+		virtual const BitSet &getCode(Unit) const = 0;
 		virtual void updateLevel() = 0;
 		virtual string getHeader() const = 0;
 		virtual double CompressionRate() const = 0;
+		virtual bool isGenerated() const = 0;
 	};
 
 
@@ -30,8 +31,6 @@ namespace lyf
 	private:
 		struct _HuffmanNode
 		{
-			using freq_t = uint64_t;
-
 			_HuffmanNode()
 				: vp(nullptr), freq(1)
 			{
@@ -58,7 +57,7 @@ namespace lyf
 			}
 
 			std::unique_ptr<const Unit> const vp;
-			freq_t freq = 1;
+			uint64_t freq = 1;
 			std::shared_ptr<_HuffmanNode> left = nullptr;
 			std::shared_ptr<_HuffmanNode> right = nullptr;
 		};
@@ -93,11 +92,14 @@ namespace lyf
 
 	public:
 		HuffmanEncoder()
-			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()),
-			  _isGenerated(false), _header(Header(1, sizeof Unit)), _CompressionRate(0),
-			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _bfsize(0)
+			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _FileTotalSize(0),
+			  _isGenerated(false), _header(Header(1, sizeof Unit)), _CompressionRate(-1),
+			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
+
+		HuffmanEncoder(const HuffmanEncoder &) = delete;
+		HuffmanEncoder &operator=(const HuffmanEncoder &) = delete;
 
 		virtual void getData(void *pdata, size_t nBytes) override
 		{
@@ -105,11 +107,11 @@ namespace lyf
 			char *p = reinterpret_cast<char*>(pdata);
 			while (nBytes)
 			{
-				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _bfsize);
-				memcpy(_pBuffer.get() + _bfsize, p, nw);
+				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _BuffSize);
+				memcpy(_pBuffer.get() + _BuffSize, p, nw);
 				p += nw;
-				_bfsize += nw;
-				if (_bfsize >= _MAX_BUFF_SIZE)
+				_BuffSize += nw;
+				if (_BuffSize >= _MAX_BUFF_SIZE)
 					_flush();
 				nBytes -= nw;
 			}
@@ -119,34 +121,31 @@ namespace lyf
 		{
 			this->_ensureNotGenerated();
 			this->_flush();
-			auto heap = lyf::newMinPriorityQueue<std::shared_ptr<Node>>([](auto e) { return e->freq; });
-			for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
+			if (_pUnit2Node->size())
 			{
-				heap.insert(it->second);
-				//(*_pUnit2BitSet)[it->first].reset(new BitSet());
-			}
-			size_t n = _pUnit2Node->size() - 1;
-			for (size_t i = 0; i < n; i++)
-			{
-				std::shared_ptr<Node> np(new Node());
-				np->left = heap.pop();
-				np->right = heap.pop();
-				np->freq = np->left->freq + np->right->freq;
-				heap.insert(np);
-			}
-			_pRoot = heap.pop();
-			if (_pUnit2Node->size() == 1)
-			{
-				(*_pUnit2BitSet)[_pRoot->value()].reset(new BitSet{ 0 });;
-				//for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
-				//{
-				//	(*_pUnit2BitSet)[it->first].reset(new BitSet{ 0 });
-				//	break;
-				//}
-			}
-			else
-			{
-				_genBitSet(_pRoot, new BitSet());
+				auto heap = lyf::newMinPriorityQueue<std::shared_ptr<Node>>([](auto e) { return e->freq; });
+				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
+				{
+					heap.insert(it->second);
+				}
+				size_t n = _pUnit2Node->size() - 1;
+				for (size_t i = 0; i < n; i++)
+				{
+					std::shared_ptr<Node> np(new Node());
+					np->left = heap.pop();
+					np->right = heap.pop();
+					np->freq = np->left->freq + np->right->freq;
+					heap.insert(np);
+				}
+				_pRoot = heap.pop();
+				if (_pUnit2Node->size() == 1)
+				{
+					(*_pUnit2BitSet)[_pRoot->value()].reset(new BitSet{ 0 });;
+				}
+				else
+				{
+					_genBitSet(_pRoot, new BitSet());
+				}
 			}
 			_isGenerated = true;
 		}
@@ -171,10 +170,29 @@ namespace lyf
 			return this->_header.getString(*_pUnit2BitSet);
 		}
 
-		virtual double CompressionRate() const
+		virtual double CompressionRate() const override
+		{
+			return const_cast<HuffmanEncoder*>(this)->CompressionRate();
+		}
+
+		double CompressionRate()
 		{
 			this->_ensureGenerated();
+			if (this->_CompressionRate < 0)
+			{
+				uint64_t compressedSize = 0;
+				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
+				{
+					compressedSize += (it->second->freq * (*_pUnit2BitSet)[it->first]->size());
+				}
+				this->_CompressionRate = static_cast<double>(compressedSize) / (this->_FileTotalSize * 8);
+			}
 			return this->_CompressionRate;
+		}
+
+		virtual bool isGenerated() const override
+		{
+			return this->_isGenerated;
 		}
 
 		uint8_t level() const
@@ -207,8 +225,9 @@ namespace lyf
 		std::unique_ptr<BMap> _pUnit2BitSet;
 		std::shared_ptr<Node> _pRoot;
 		std::unique_ptr<Buff_t[]> _pBuffer;
-		size_t _bfsize;
+		size_t _BuffSize;
 		Header _header;
+		uint64_t _FileTotalSize;
 		double _CompressionRate;
 		bool _isGenerated;
 
@@ -226,7 +245,7 @@ namespace lyf
 
 		void _flush()
 		{
-			auto size = _bfsize / sizeof Unit;
+			auto size = _BuffSize / sizeof Unit;
 			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
 			for (size_t i = 0; i != size; i++)
 			{
@@ -236,7 +255,7 @@ namespace lyf
 				else
 					(*_pUnit2Node)[v]->freq++;
 			}
-			auto rest = _bfsize - size * sizeof Unit;
+			auto rest = _BuffSize - size * sizeof Unit;
 			if (rest)
 			{
 				char *cp = reinterpret_cast<char*>(p + size);
@@ -251,7 +270,8 @@ namespace lyf
 				else
 					(*_pUnit2Node)[v]->freq++;
 			}
-			_bfsize = 0;
+			_FileTotalSize += _BuffSize;
+			_BuffSize = 0;
 		}
 
 		void _reset()
@@ -259,7 +279,9 @@ namespace lyf
 			_pRoot = nullptr;
 			_pUnit2Node->clear();
 			_pUnit2BitSet->clear();
-			_bfsize = 0;
+			_BuffSize = 0;
+			_FileTotalSize = 0;
+			_CompressionRate = -1;
 			_isGenerated = false;
 		}
 
@@ -328,7 +350,8 @@ namespace lyf
 			_encoder.getData(buffer.get(), rest);
 			inf.close();
 			_encoder.generate();
-			_encoder.showCodes(100);
+			_encoder.showCodes();
+			cout << _encoder.CompressionRate() << endl;
 
 		}
 
