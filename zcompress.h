@@ -86,6 +86,7 @@ namespace lyf
 			  _state(UNGENERATED), _nDataFillBytes(0), _CompressionRate(-1), _pHeader(nullptr),
 			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
+			this->_encodeTo.sync_with_stdio(false);
 		}
 
 		HuffmanEncoder(const HuffmanEncoder &) = delete;
@@ -215,7 +216,7 @@ namespace lyf
 			if (_encodeTo.is_open())
 				_encodeTo.close();
 			_BuffSize = 0;
-			_encodeTo.open(filename, std::ios::binary | std::ios::app);
+			_encodeTo.open(filename, std::ofstream::binary);
 			if (!_encodeTo)
 				throw std::runtime_error("Fail to create or open the file.");
 			_state = ENCODING;
@@ -310,7 +311,7 @@ namespace lyf
 			if (rest)
 			{
 				_nDataFillBytes = sizeof Unit - rest;
-				char *cp = reinterpret_cast<char*>(_pBuffer.get() + size);
+				char *cp = _pBuffer.get() + _BuffSize;
 				for (size_t i = 0, len = sizeof Unit - rest; i != len; i++)
 					cp[i] = 0;
 				size++;
@@ -334,7 +335,7 @@ namespace lyf
 			auto rest = _BuffSize - size * sizeof Unit;
 			if (rest)
 			{
-				char *cp = reinterpret_cast<char*>(_pBuffer.get() + size);
+				char *cp = _pBuffer.get() + _BuffSize;
 				for (size_t i = 0, len = sizeof Unit - rest; i != len; i++)
 					cp[i] = 0;
 				size++;
@@ -425,14 +426,22 @@ namespace lyf
 			size_t rest = fsize - cnt * bfsize;
 			inf.read(buffer.get(), rest);
 			_pEncoder->readForGen(buffer.get(), rest);
-			inf.close();
 			_pEncoder->generate();
-			_pEncoder->showCodes(100);
-			cout << _pEncoder->CompressionRate() << endl;
+			//_pEncoder->showCodes(100);
+			//cout << _pEncoder->CompressionRate() << endl;
 			
-			string header = _pEncoder->getHeader();
-			cout << header.size() << endl;
-
+			//string header = _pEncoder->getHeader();
+			//cout << header.size() << endl;
+			_pEncoder->startEncodingTo("encoded");
+			inf.seekg(0);
+			for (size_t i = 0; i != cnt; i++)
+			{
+				inf.read(buffer.get(), bfsize);
+				_pEncoder->encode(buffer.get(), bfsize);
+			}
+			inf.read(buffer.get(), rest);
+			_pEncoder->encode(buffer.get(), rest);
+			_pEncoder->finishEncoding();
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
