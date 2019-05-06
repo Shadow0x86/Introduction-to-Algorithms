@@ -15,13 +15,23 @@ namespace lyf
 	public:
 		using BitSet = std::vector<bool>;
 
-		virtual void getData(void *, size_t) = 0;
+		virtual void readForGen(void *pdata, size_t nBytes) = 0;
 		virtual void generate() = 0;
-		virtual BitSet getCode(Unit) const = 0;
+		virtual BitSet getCode(Unit data) const = 0;
+		virtual void startEncodingTo(string filename) = 0;
+		virtual void encode(void *pdata, size_t nBytes) = 0;
+		virtual void finishEncoding() = 0;
 		virtual void reset() = 0;
 		virtual string getHeader() const = 0;
 		virtual double CompressionRate() const = 0;
-		virtual bool isGenerated() const = 0;
+	};
+
+	enum EncodeState
+	{
+		UNGENERATED = 1,
+		GENERATED = 2,
+		ENCODING = 4,
+		ENCODED = 8
 	};
 
 
@@ -73,7 +83,7 @@ namespace lyf
 	public:
 		HuffmanEncoder()
 			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _FileTotalSize(0),
-			  _isGenerated(false), _nDataFillBytes(0), _CompressionRate(-1), _pHeader(nullptr),
+			  _state(UNGENERATED), _nDataFillBytes(0), _CompressionRate(-1), _pHeader(nullptr),
 			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
@@ -81,9 +91,9 @@ namespace lyf
 		HuffmanEncoder(const HuffmanEncoder &) = delete;
 		HuffmanEncoder &operator=(const HuffmanEncoder &) = delete;
 
-		virtual void getData(void *pdata, size_t nBytes) override
+		virtual void readForGen(void *pdata, size_t nBytes) override
 		{
-			this->_ensureNotGenerated();
+			this->_ensureStates(UNGENERATED, "The encoder has been generated. Call reset() to reset it.");
 			char *p = reinterpret_cast<char*>(pdata);
 			while (nBytes)
 			{
@@ -92,15 +102,15 @@ namespace lyf
 				p += nw;
 				_BuffSize += nw;
 				if (_BuffSize >= _MAX_BUFF_SIZE)
-					_flush();
+					_flushToTree();
 				nBytes -= nw;
 			}
 		}
 
 		virtual void generate() override
 		{
-			this->_ensureNotGenerated();
-			this->_flush();
+			this->_ensureStates(UNGENERATED, "The encoder has been generated. Call reset() to reset it.");
+			this->_flushToTree();
 			if (_pUnit2Node->size())
 			{
 				auto heap = lyf::newMinPriorityQueue<std::shared_ptr<Node>>([](auto e) { return e->freq; });
@@ -127,12 +137,12 @@ namespace lyf
 					_genBitSet(_pRoot, new BitSet());
 				}
 			}
-			_isGenerated = true;
+			_state = GENERATED;
 		}
 
 		virtual BitSet getCode(Unit data) const override
 		{
-			this->_ensureGenerated();
+			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			return *((*_pUnit2BitSet)[data]);
 		}
 
@@ -143,7 +153,7 @@ namespace lyf
 
 		string getHeader()
 		{
-			this->_ensureGenerated();
+			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (!this->_pHeader)
 			{
 				this->_pHeader.reset(new string);
@@ -186,7 +196,7 @@ namespace lyf
 
 		double CompressionRate()
 		{
-			this->_ensureGenerated();
+			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (this->_CompressionRate < 0)
 			{
 				uint64_t compressedSize = 0;
@@ -199,9 +209,41 @@ namespace lyf
 			return this->_CompressionRate;
 		}
 
-		virtual bool isGenerated() const override
+		virtual void startEncodingTo(string filename) override
 		{
-			return this->_isGenerated;
+			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
+			if (_encodeTo.is_open())
+				_encodeTo.close();
+			_encodeTo.open(filename, std::ios::binary | std::ios::app);
+			if (!_encodeTo)
+				throw std::runtime_error("Fail to create the file.");
+			_state = ENCODING;
+		}
+
+		virtual void encode(void *pdata, size_t nBytes) override
+		{
+			this->_ensureStates(ENCODING, "Must call startEncodingTo() first!");
+			char *p = reinterpret_cast<char*>(pdata);
+			while (nBytes)
+			{
+				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _BuffSize);
+				memcpy(_pBuffer.get() + _BuffSize, p, nw);
+				p += nw;
+				_BuffSize += nw;
+				if (_BuffSize >= _MAX_BUFF_SIZE)
+					_flushToFile();
+				nBytes -= nw;
+			}
+		}
+
+		virtual void finishEncoding() override
+		{
+			if (_state != ENCODING)
+				return;
+			_flushToFile();
+			if (_encodeTo.is_open())
+				_encodeTo.close();
+			_state = GENERATED;
 		}
 
 		virtual void reset() override
@@ -214,12 +256,12 @@ namespace lyf
 			_nDataFillBytes = 0;
 			_FileTotalSize = 0;
 			_CompressionRate = -1;
-			_isGenerated = false;
+			_state = UNGENERATED;
 		}
 
 		void showCodes(size_t n = 0)
 		{
-			this->_ensureGenerated();
+			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (!n)
 				n = _pUnit2BitSet->size();
 			size_t k = 0;
@@ -245,21 +287,22 @@ namespace lyf
 		char _nDataFillBytes;
 		uint64_t _FileTotalSize;
 		double _CompressionRate;
-		bool _isGenerated;
+		std::ofstream _encodeTo;
+		int _state;
 
-		void _ensureGenerated() const
+		void _ensureStates(int states, const char* err_msg = "") const
 		{
-			if (!_isGenerated)
-				throw std::runtime_error("Must call generate() first!");
+			if (!(this->_state & states))
+				throw std::runtime_error(err_msg);
 		}
 
-		void _ensureNotGenerated() const
+		void _ensureNoStates(int states, const char *err_msg = "") const
 		{
-			if (_isGenerated)
-				throw std::runtime_error("The encoder has been generated. Call reset() to reset it.");
+			if (this->_state & states)
+				throw std::runtime_error(err_msg);
 		}
 
-		void _flush()
+		void _flushToTree()
 		{
 			auto size = _BuffSize / sizeof Unit;
 			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
@@ -288,6 +331,34 @@ namespace lyf
 				_nDataFillBytes = sizeof Unit - rest;
 			}
 			_FileTotalSize += _BuffSize;
+			_BuffSize = 0;
+		}
+
+		void _flushToFile()
+		{
+			auto size = _BuffSize / sizeof Unit;
+			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
+			for (size_t i = 0; i != size; i++)
+			{
+				auto bs = *((*_pUnit2BitSet)[p[i]]);
+				
+			}
+			auto rest = _BuffSize - size * sizeof Unit;
+			if (rest)
+			{
+				char *cp = reinterpret_cast<char*>(p + size);
+				Unit v = 0;
+				for (size_t i = 0; i != rest; i++)
+				{
+					Unit d = cp[i];
+					v += (d << ((sizeof Unit - 1 - i) * 8));
+				}
+				if (_pUnit2Node->find(v) == _pUnit2Node->end())
+					(*_pUnit2Node)[v].reset(new Node(v));
+				else
+					(*_pUnit2Node)[v]->freq++;
+				_nDataFillBytes = sizeof Unit - rest;
+			}
 			_BuffSize = 0;
 		}
 
@@ -339,7 +410,7 @@ namespace lyf
 			std::ifstream inf(file, std::ifstream::binary);
 			if (!inf)
 				throw std::runtime_error("The file does not exist.");
-
+			inf.sync_with_stdio(false);
 			inf.seekg(0, std::ifstream::end);
 			size_t fsize = inf.tellg();
 			inf.seekg(0);
@@ -349,11 +420,11 @@ namespace lyf
 			for (size_t i = 0; i != cnt; i++)
 			{
 				inf.read(buffer.get(), bfsize);
-				_pEncoder->getData(buffer.get(), bfsize);
+				_pEncoder->readForGen(buffer.get(), bfsize);
 			}
 			size_t rest = fsize - cnt * bfsize;
 			inf.read(buffer.get(), rest);
-			_pEncoder->getData(buffer.get(), rest);
+			_pEncoder->readForGen(buffer.get(), rest);
 			inf.close();
 			_pEncoder->generate();
 			_pEncoder->showCodes(100);
