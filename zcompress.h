@@ -83,8 +83,8 @@ namespace lyf
 	public:
 		HuffmanEncoder()
 			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _FileTotalSize(0),
-			  _state(UNGENERATED), _nDataFillBytes(0), _CompressionRate(-1), _pHeader(nullptr),
-			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
+			  _state(UNGENERATED), _nDataFillBytes(0), _nCodeFillBits(0), _CompressionRate(-1),
+			  _pHeader(nullptr), _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 			this->_encodeTo.sync_with_stdio(false);
 		}
@@ -154,11 +154,12 @@ namespace lyf
 
 		string getHeader()
 		{
-			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
+			this->_ensureStates(ENCODED, "Must call finishEncoding() first!");
 			if (!this->_pHeader)
 			{
 				this->_pHeader.reset(new string);
 				this->_pHeader->push_back(_nDataFillBytes);
+				this->_pHeader->push_back(_nCodeFillBits);
 				char nDataUnitBytes = sizeof Unit;
 				this->_pHeader->push_back(nDataUnitBytes);
 				for (auto it = _pUnit2BitSet->begin(); it != _pUnit2BitSet->end(); it++)
@@ -245,7 +246,7 @@ namespace lyf
 			_flushToFile();
 			if (_encodeTo.is_open())
 				_encodeTo.close();
-			_state = GENERATED;
+			_state = ENCODED;
 		}
 
 		virtual void reset() override
@@ -256,6 +257,7 @@ namespace lyf
 			_BuffSize = 0;
 			_pHeader.reset();
 			_nDataFillBytes = 0;
+			_nCodeFillBits = 0;
 			_FileTotalSize = 0;
 			_CompressionRate = -1;
 			_state = UNGENERATED;
@@ -287,6 +289,7 @@ namespace lyf
 		size_t _BuffSize;
 		std::unique_ptr<string> _pHeader;
 		char _nDataFillBytes;
+		char _nCodeFillBits;
 		uint64_t _FileTotalSize;
 		double _CompressionRate;
 		std::ofstream _encodeTo;
@@ -358,7 +361,10 @@ namespace lyf
 				}
 			}
 			if (pos)
+			{
 				s.push_back(c);
+				_nCodeFillBits = 8 - pos;
+			}
 			this->_encodeTo.write(s.data(), s.size());
 			_BuffSize = 0;
 		}
@@ -428,10 +434,7 @@ namespace lyf
 			_pEncoder->readForGen(buffer.get(), rest);
 			_pEncoder->generate();
 			//_pEncoder->showCodes(100);
-			//cout << _pEncoder->CompressionRate() << endl;
-			
-			//string header = _pEncoder->getHeader();
-			//cout << header.size() << endl;
+			cout << _pEncoder->CompressionRate() << endl;
 			_pEncoder->startEncodingTo("encoded");
 			inf.seekg(0);
 			for (size_t i = 0; i != cnt; i++)
@@ -442,6 +445,8 @@ namespace lyf
 			inf.read(buffer.get(), rest);
 			_pEncoder->encode(buffer.get(), rest);
 			_pEncoder->finishEncoding();
+			string header = _pEncoder->getHeader();
+			cout << header.size() << endl;
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
@@ -451,7 +456,7 @@ namespace lyf
 		std::unique_ptr<Encoder> _pEncoder;
 	};
 
-	using HuffmanCompresser = ZCompresser<HuffmanEncoder<uint16_t>>;
+	using HuffmanCompresser = ZCompresser<HuffmanEncoder<uint64_t>>;
 
 
 	class ZDecompresser : public _BaseZCompresser
