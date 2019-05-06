@@ -214,9 +214,10 @@ namespace lyf
 			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (_encodeTo.is_open())
 				_encodeTo.close();
+			_BuffSize = 0;
 			_encodeTo.open(filename, std::ios::binary | std::ios::app);
 			if (!_encodeTo)
-				throw std::runtime_error("Fail to create the file.");
+				throw std::runtime_error("Fail to create or open the file.");
 			_state = ENCODING;
 		}
 
@@ -305,6 +306,15 @@ namespace lyf
 		void _flushToTree()
 		{
 			auto size = _BuffSize / sizeof Unit;
+			auto rest = _BuffSize - size * sizeof Unit;
+			if (rest)
+			{
+				_nDataFillBytes = sizeof Unit - rest;
+				char *cp = reinterpret_cast<char*>(_pBuffer.get() + size);
+				for (size_t i = 0, len = sizeof Unit - rest; i != len; i++)
+					cp[i] = 0;
+				size++;
+			}
 			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
 			for (size_t i = 0; i != size; i++)
 			{
@@ -314,22 +324,6 @@ namespace lyf
 				else
 					(*_pUnit2Node)[v]->freq++;
 			}
-			auto rest = _BuffSize - size * sizeof Unit;
-			if (rest)
-			{
-				char *cp = reinterpret_cast<char*>(p + size);
-				Unit v = 0;
-				for (size_t i = 0; i != rest; i++)
-				{
-					Unit d = cp[i];
-					v += (d << ((sizeof Unit - 1 - i) * 8));
-				}
-				if (_pUnit2Node->find(v) == _pUnit2Node->end())
-					(*_pUnit2Node)[v].reset(new Node(v));
-				else
-					(*_pUnit2Node)[v]->freq++;
-				_nDataFillBytes = sizeof Unit - rest;
-			}
 			_FileTotalSize += _BuffSize;
 			_BuffSize = 0;
 		}
@@ -337,28 +331,34 @@ namespace lyf
 		void _flushToFile()
 		{
 			auto size = _BuffSize / sizeof Unit;
-			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
-			for (size_t i = 0; i != size; i++)
-			{
-				auto bs = *((*_pUnit2BitSet)[p[i]]);
-				
-			}
 			auto rest = _BuffSize - size * sizeof Unit;
 			if (rest)
 			{
-				char *cp = reinterpret_cast<char*>(p + size);
-				Unit v = 0;
-				for (size_t i = 0; i != rest; i++)
-				{
-					Unit d = cp[i];
-					v += (d << ((sizeof Unit - 1 - i) * 8));
-				}
-				if (_pUnit2Node->find(v) == _pUnit2Node->end())
-					(*_pUnit2Node)[v].reset(new Node(v));
-				else
-					(*_pUnit2Node)[v]->freq++;
-				_nDataFillBytes = sizeof Unit - rest;
+				char *cp = reinterpret_cast<char*>(_pBuffer.get() + size);
+				for (size_t i = 0, len = sizeof Unit - rest; i != len; i++)
+					cp[i] = 0;
+				size++;
 			}
+			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
+			string s;
+			char c = 0, pos = 0;
+			for (size_t i = 0; i != size; i++)
+			{
+				const BitSet &bs = *((*_pUnit2BitSet)[p[i]]);
+				for (auto it = bs.begin(); it != bs.end(); it++)
+				{
+					c += ((*it) << (7 - pos));
+					if (++pos == 8)
+					{
+						pos = 0;
+						s.push_back(c);
+						c = 0;
+					}
+				}
+			}
+			if (pos)
+				s.push_back(c);
+			this->_encodeTo.write(s.data(), s.size());
 			_BuffSize = 0;
 		}
 
