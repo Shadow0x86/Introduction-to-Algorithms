@@ -360,7 +360,6 @@ namespace lyf
 			_nDataFillBytes = header[0];
 			_nCodeFillBits = header[1];
 			_nUnitBytes = header[2];
-			cout << int(_nUnitBytes) << endl;
 			size_t pos = 3;
 			while (pos != header.size())
 			{
@@ -375,7 +374,7 @@ namespace lyf
 				unsigned char flag = 128;
 				for (size_t j = 0; j != nCodeBits; j++)
 				{
-					bs.push_back(!!(header[pos] & flag));
+					bs.push_back(header[pos] & flag);
 					flag /= 2;
 					if (flag == 0)
 					{
@@ -413,10 +412,10 @@ namespace lyf
 				}
 				cout << ": ";
 				uint64_t v = 0;
-				char j = _nUnitBytes - 1;
+				int j = 0;
 				for (unsigned char s : it->second)
 				{
-					v += (s << (j * 8));
+					v += static_cast<uint64_t>(s) << (j * 8);
 					j++;
 				}
 				cout << v << endl;
