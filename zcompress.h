@@ -10,15 +10,6 @@
 namespace lyf
 {
 
-	enum EncodeState
-	{
-		UNGENERATED = 1,
-		GENERATED = 2,
-		ENCODING = 4,
-		ENCODED = 8
-	};
-
-
 	template<typename Unit>
 	class HuffmanEncoder
 	{
@@ -57,8 +48,7 @@ namespace lyf
 		};
 
 	public:
-		using _MyBase = ZEncoderInterface<Unit>;
-		using BitSet = typename _MyBase::BitSet;
+		using BitSet = vector<bool>;
 		using Node = _HuffmanNode;
 		using NMap = std::unordered_map<Unit, std::shared_ptr<Node>>;
 		using BMap = std::unordered_map<Unit, std::unique_ptr<BitSet>>;
@@ -66,71 +56,46 @@ namespace lyf
 
 	public:
 		HuffmanEncoder()
-			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _FileTotalSize(0),
-			  _state(UNGENERATED), _nDataFillBytes(0), _nCodeFillBits(0), _CompressionRate(-1),
-			  _pHeader(nullptr), _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
+			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _DataTotalSize(0),
+			  _nDataFillBytes(0), _nCodeFillBits(0), _CompressionRate(-1), _pHeader(nullptr),
+			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
-			this->_encodeTo.sync_with_stdio(false);
 		}
 
 		HuffmanEncoder(const HuffmanEncoder &) = delete;
 		HuffmanEncoder &operator=(const HuffmanEncoder &) = delete;
 
-		void encode(string srcfile, string dstfile);
-		std::unique_ptr<string> encode(const string &s);
-
-		void readForGen(void *pdata, size_t nBytes)
+		void encode(string srcfile, string dstfile)
 		{
-			this->_ensureStates(UNGENERATED, "The encoder has been generated. Call reset() to reset it.");
-			char *p = reinterpret_cast<char*>(pdata);
-			while (nBytes)
-			{
-				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _BuffSize);
-				memcpy(_pBuffer.get() + _BuffSize, p, nw);
-				p += nw;
-				_BuffSize += nw;
-				if (_BuffSize >= _MAX_BUFF_SIZE)
-					_flushToTree();
-				nBytes -= nw;
-			}
+			// read the src file data to buffer
+			std::ifstream inf(srcfile, std::ifstream::binary);
+			if (!inf)
+				throw std::runtime_error("The src file does not exist.");
+			this->reset();
+			inf.sync_with_stdio(false);
+			inf.seekg(0, std::ifstream::end);
+			size_t fsize = inf.tellg();
+			const size_t cnt = fsize / _MAX_BUFF_SIZE;
+			const size_t rest = fsize - cnt * _MAX_BUFF_SIZE;
+
+			this->_readFile(inf, cnt, rest, [&]() { this->_flushToTree(); });
+
+			_generate();
+
+			std::ofstream outf(dstfile, std::ofstream::binary);
+			if (!outf)
+				throw std::runtime_error("Fail to create or open the dst file.");
+			outf.sync_with_stdio(false);
+			this->_readFile(inf, cnt, rest, [&]() { this->_flushToFile(outf); });
 		}
 
-		void generate()
+		std::unique_ptr<string> encode(const string &s)
 		{
-			this->_ensureStates(UNGENERATED, "The encoder has been generated. Call reset() to reset it.");
-			this->_flushToTree();
-			if (_pUnit2Node->size())
-			{
-				auto heap = lyf::newMinPriorityQueue<std::shared_ptr<Node>>([](auto e) { return e->freq; });
-				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
-				{
-					heap.insert(it->second);
-				}
-				size_t n = _pUnit2Node->size() - 1;
-				for (size_t i = 0; i < n; i++)
-				{
-					std::shared_ptr<Node> np(new Node());
-					np->left = heap.pop();
-					np->right = heap.pop();
-					np->freq = np->left->freq + np->right->freq;
-					heap.insert(np);
-				}
-				_pRoot = heap.pop();
-				if (_pUnit2Node->size() == 1)
-				{
-					(*_pUnit2BitSet)[_pRoot->value()].reset(new BitSet{ 0 });;
-				}
-				else
-				{
-					_genBitSet(_pRoot, new BitSet());
-				}
-			}
-			_state = GENERATED;
+			// TODO
 		}
 
 		BitSet getCode(Unit data) const
 		{
-			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			return *((*_pUnit2BitSet)[data]);
 		}
 
@@ -141,7 +106,6 @@ namespace lyf
 
 		string getHeader()
 		{
-			this->_ensureStates(ENCODED, "Must call finishEncoding() first!");
 			if (!this->_pHeader)
 			{
 				this->_pHeader.reset(new string);
@@ -185,7 +149,6 @@ namespace lyf
 
 		double CompressionRate()
 		{
-			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (this->_CompressionRate < 0)
 			{
 				uint64_t compressedSize = 0;
@@ -193,47 +156,9 @@ namespace lyf
 				{
 					compressedSize += (it->second->freq * (*_pUnit2BitSet)[it->first]->size());
 				}
-				this->_CompressionRate = static_cast<double>(compressedSize) / (this->_FileTotalSize * 8);
+				this->_CompressionRate = static_cast<double>(compressedSize + 7) / 8 / this->_DataTotalSize;
 			}
 			return this->_CompressionRate;
-		}
-
-		void startEncodingTo(string filename)
-		{
-			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
-			if (_encodeTo.is_open())
-				_encodeTo.close();
-			_BuffSize = 0;
-			_encodeTo.open(filename, std::ofstream::binary);
-			if (!_encodeTo)
-				throw std::runtime_error("Fail to create or open the file.");
-			_state = ENCODING;
-		}
-
-		void encode(void *pdata, size_t nBytes)
-		{
-			this->_ensureStates(ENCODING, "Must call startEncodingTo() first!");
-			char *p = reinterpret_cast<char*>(pdata);
-			while (nBytes)
-			{
-				size_t nw = std::min(nBytes, _MAX_BUFF_SIZE - _BuffSize);
-				memcpy(_pBuffer.get() + _BuffSize, p, nw);
-				p += nw;
-				_BuffSize += nw;
-				if (_BuffSize >= _MAX_BUFF_SIZE)
-					_flushToFile();
-				nBytes -= nw;
-			}
-		}
-
-		void finishEncoding()
-		{
-			if (_state != ENCODING)
-				return;
-			_flushToFile();
-			if (_encodeTo.is_open())
-				_encodeTo.close();
-			_state = ENCODED;
 		}
 
 		void reset()
@@ -245,14 +170,12 @@ namespace lyf
 			_pHeader.reset();
 			_nDataFillBytes = 0;
 			_nCodeFillBits = 0;
-			_FileTotalSize = 0;
+			_DataTotalSize = 0;
 			_CompressionRate = -1;
-			_state = UNGENERATED;
 		}
 
 		void showCodes(size_t n = 0)
 		{
-			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (!n)
 				n = _pUnit2BitSet->size();
 			size_t k = 0;
@@ -277,21 +200,56 @@ namespace lyf
 		std::unique_ptr<string> _pHeader;
 		char _nDataFillBytes;
 		char _nCodeFillBits;
-		uint64_t _FileTotalSize;
+		uint64_t _DataTotalSize;
 		double _CompressionRate;
-		std::ofstream _encodeTo;
-		int _state;
 
-		void _ensureStates(int states, const char *err_msg = "") const
+		template<typename Func>
+		void _readFile(std::ifstream &inf, size_t cnt, size_t rest, Func flush)
 		{
-			if (!(this->_state & states))
-				throw std::runtime_error(err_msg);
+			inf.seekg(0);
+			for (size_t i = 0; i != cnt; i++)
+			{
+				inf.read(_pBuffer.get(), _MAX_BUFF_SIZE);
+				_BuffSize = _MAX_BUFF_SIZE;
+				flush();
+			}
+			if (rest)
+			{
+				inf.read(_pBuffer.get(), rest);
+				_BuffSize = rest;
+				flush();
+			}
 		}
 
-		void _ensureNoStates(int states, const char *err_msg = "") const
+		void _generate()
 		{
-			if (this->_state & states)
-				throw std::runtime_error(err_msg);
+			this->_flushToTree();
+			if (_pUnit2Node->size())
+			{
+				auto heap = lyf::newMinPriorityQueue<std::shared_ptr<Node>>([](auto e) { return e->freq; });
+				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
+				{
+					heap.insert(it->second);
+				}
+				size_t n = _pUnit2Node->size() - 1;
+				for (size_t i = 0; i < n; i++)
+				{
+					std::shared_ptr<Node> np(new Node());
+					np->left = heap.pop();
+					np->right = heap.pop();
+					np->freq = np->left->freq + np->right->freq;
+					heap.insert(np);
+				}
+				_pRoot = heap.pop();
+				if (_pUnit2Node->size() == 1)
+				{
+					(*_pUnit2BitSet)[_pRoot->value()].reset(new BitSet{ 0 });;
+				}
+				else
+				{
+					_genBitSet(_pRoot, new BitSet());
+				}
+			}
 		}
 
 		void _flushToTree()
@@ -315,11 +273,11 @@ namespace lyf
 				else
 					(*_pUnit2Node)[v]->freq++;
 			}
-			_FileTotalSize += _BuffSize;
+			_DataTotalSize += _BuffSize;
 			_BuffSize = 0;
 		}
 
-		void _flushToFile()
+		void _flushToFile(std::ofstream &outf)
 		{
 			auto size = _BuffSize / sizeof Unit;
 			auto rest = _BuffSize - size * sizeof Unit;
@@ -352,7 +310,7 @@ namespace lyf
 				s.push_back(c);
 				_nCodeFillBits = 8 - pos;
 			}
-			this->_encodeTo.write(s.data(), s.size());
+			outf.write(s.data(), s.size());
 			_BuffSize = 0;
 		}
 
@@ -399,41 +357,13 @@ namespace lyf
 		{
 		}
 
-		void compress(string file, uint8_t level = 9)
+		void compress(string src, string dst, uint8_t level = 9)
 		{
-			std::ifstream inf(file, std::ifstream::binary);
-			if (!inf)
-				throw std::runtime_error("The file does not exist.");
-			inf.sync_with_stdio(false);
-			inf.seekg(0, std::ifstream::end);
-			size_t fsize = inf.tellg();
-			inf.seekg(0);
-			const size_t bfsize = 4096;
-			std::unique_ptr<char[]> buffer(new char[bfsize]);
-			const size_t cnt = fsize / bfsize;
-			for (size_t i = 0; i != cnt; i++)
-			{
-				inf.read(buffer.get(), bfsize);
-				_pEncoder->readForGen(buffer.get(), bfsize);
-			}
-			size_t rest = fsize - cnt * bfsize;
-			inf.read(buffer.get(), rest);
-			_pEncoder->readForGen(buffer.get(), rest);
-			_pEncoder->generate();
+			_pEncoder->encode(src, dst);
 			//_pEncoder->showCodes(100);
 			cout << _pEncoder->CompressionRate() << endl;
-			_pEncoder->startEncodingTo("encoded");
-			inf.seekg(0);
-			for (size_t i = 0; i != cnt; i++)
-			{
-				inf.read(buffer.get(), bfsize);
-				_pEncoder->encode(buffer.get(), bfsize);
-			}
-			inf.read(buffer.get(), rest);
-			_pEncoder->encode(buffer.get(), rest);
-			_pEncoder->finishEncoding();
-			string header = _pEncoder->getHeader();
-			cout << header.size() << endl;
+			//string header = _pEncoder->getHeader();
+			//cout << header.size() << endl;
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
