@@ -9,22 +9,6 @@
 
 namespace lyf
 {
-	template<typename Unit>
-	class ZEncoderInterface
-	{
-	public:
-		using BitSet = std::vector<bool>;
-
-		virtual void readForGen(void *pdata, size_t nBytes) = 0;
-		virtual void generate() = 0;
-		virtual BitSet getCode(Unit data) const = 0;
-		virtual void startEncodingTo(string filename) = 0;
-		virtual void encode(void *pdata, size_t nBytes) = 0;
-		virtual void finishEncoding() = 0;
-		virtual void reset() = 0;
-		virtual string getHeader() const = 0;
-		virtual double CompressionRate() const = 0;
-	};
 
 	enum EncodeState
 	{
@@ -36,7 +20,7 @@ namespace lyf
 
 
 	template<typename Unit>
-	class HuffmanEncoder : public ZEncoderInterface<Unit>
+	class HuffmanEncoder
 	{
 	private:
 		struct _HuffmanNode
@@ -92,7 +76,10 @@ namespace lyf
 		HuffmanEncoder(const HuffmanEncoder &) = delete;
 		HuffmanEncoder &operator=(const HuffmanEncoder &) = delete;
 
-		virtual void readForGen(void *pdata, size_t nBytes) override
+		void encode(string srcfile, string dstfile);
+		std::unique_ptr<string> encode(const string &s);
+
+		void readForGen(void *pdata, size_t nBytes)
 		{
 			this->_ensureStates(UNGENERATED, "The encoder has been generated. Call reset() to reset it.");
 			char *p = reinterpret_cast<char*>(pdata);
@@ -108,7 +95,7 @@ namespace lyf
 			}
 		}
 
-		virtual void generate() override
+		void generate()
 		{
 			this->_ensureStates(UNGENERATED, "The encoder has been generated. Call reset() to reset it.");
 			this->_flushToTree();
@@ -141,13 +128,13 @@ namespace lyf
 			_state = GENERATED;
 		}
 
-		virtual BitSet getCode(Unit data) const override
+		BitSet getCode(Unit data) const
 		{
 			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			return *((*_pUnit2BitSet)[data]);
 		}
 
-		virtual string getHeader() const override
+		string getHeader() const
 		{
 			return const_cast<HuffmanEncoder*>(this)->getHeader();
 		}
@@ -191,7 +178,7 @@ namespace lyf
 			return *(this->_pHeader);
 		}
 
-		virtual double CompressionRate() const override
+		double CompressionRate() const
 		{
 			return const_cast<HuffmanEncoder*>(this)->CompressionRate();
 		}
@@ -211,7 +198,7 @@ namespace lyf
 			return this->_CompressionRate;
 		}
 
-		virtual void startEncodingTo(string filename) override
+		void startEncodingTo(string filename)
 		{
 			this->_ensureNoStates(UNGENERATED, "Must call generate() first!");
 			if (_encodeTo.is_open())
@@ -223,7 +210,7 @@ namespace lyf
 			_state = ENCODING;
 		}
 
-		virtual void encode(void *pdata, size_t nBytes) override
+		void encode(void *pdata, size_t nBytes)
 		{
 			this->_ensureStates(ENCODING, "Must call startEncodingTo() first!");
 			char *p = reinterpret_cast<char*>(pdata);
@@ -239,7 +226,7 @@ namespace lyf
 			}
 		}
 
-		virtual void finishEncoding() override
+		void finishEncoding()
 		{
 			if (_state != ENCODING)
 				return;
@@ -249,7 +236,7 @@ namespace lyf
 			_state = ENCODED;
 		}
 
-		virtual void reset() override
+		void reset()
 		{
 			_pRoot = nullptr;
 			_pUnit2Node->clear();
@@ -295,7 +282,7 @@ namespace lyf
 		std::ofstream _encodeTo;
 		int _state;
 
-		void _ensureStates(int states, const char* err_msg = "") const
+		void _ensureStates(int states, const char *err_msg = "") const
 		{
 			if (!(this->_state & states))
 				throw std::runtime_error(err_msg);
