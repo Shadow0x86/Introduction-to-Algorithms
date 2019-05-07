@@ -142,24 +142,24 @@ namespace lyf
 			return *(this->_pHeader);
 		}
 
-		double CompressionRate() const
-		{
-			return const_cast<HuffmanEncoder*>(this)->CompressionRate();
-		}
+		//double CompressionRate() const
+		//{
+		//	return const_cast<HuffmanEncoder*>(this)->CompressionRate();
+		//}
 
-		double CompressionRate()
-		{
-			if (this->_CompressionRate < 0)
-			{
-				uint64_t compressedSize = 0;
-				for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
-				{
-					compressedSize += (it->second->freq * (*_pUnit2BitSet)[it->first]->size());
-				}
-				this->_CompressionRate = static_cast<double>(compressedSize + 7) / 8 / this->_DataTotalSize;
-			}
-			return this->_CompressionRate;
-		}
+		//double CompressionRate()
+		//{
+		//	if (this->_CompressionRate < 0)
+		//	{
+		//		uint64_t compressedSize = 0;
+		//		for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
+		//		{
+		//			compressedSize += (it->second->freq * (*_pUnit2BitSet)[it->first]->size());
+		//		}
+		//		this->_CompressionRate = static_cast<double>(compressedSize + 7) / 8 / this->_DataTotalSize;
+		//	}
+		//	return this->_CompressionRate;
+		//}
 
 		void reset()
 		{
@@ -336,6 +336,101 @@ namespace lyf
 	};
 
 
+	class HuffmanDecoder
+	{
+	public:
+		using BitSet = vector<bool>;
+		using BMap = std::unordered_map<BitSet, string>;
+
+		HuffmanDecoder()
+			: _pBitSet2Data(nullptr), _nDataFillBytes(0), _nCodeFillBits(0),
+			_nUnitBytes(0)
+		{
+		}
+
+		HuffmanDecoder(string header)
+			: HuffmanDecoder()
+		{
+			this->setHeader(header);
+		}
+
+		void setHeader(string header)
+		{
+			_pBitSet2Data.reset(new BMap());
+			_nDataFillBytes = header[0];
+			_nCodeFillBits = header[1];
+			_nUnitBytes = header[2];
+			cout << int(_nUnitBytes) << endl;
+			size_t pos = 3;
+			while (pos != header.size())
+			{
+				size_t nCodeBits = 0;
+				for (char j = 0; j != _nUnitBytes; j++)
+				{
+					auto c = static_cast<unsigned char>(header[pos + j]);
+					nCodeBits += (c << ((_nUnitBytes - 1 - j) * 8));
+				}
+				pos += _nUnitBytes;
+				BitSet bs;
+				unsigned char flag = 128;
+				for (size_t j = 0; j != nCodeBits; j++)
+				{
+					bs.push_back(!!(header[pos] & flag));
+					flag /= 2;
+					if (flag == 0)
+					{
+						pos++;
+						flag = 128;
+					}
+				}
+				if (flag != 128)
+					pos++;
+				(*_pBitSet2Data)[bs] = header.substr(pos, _nUnitBytes);
+				pos += _nUnitBytes;
+			}
+		}
+
+		void decode(string src, string dst)
+		{
+
+		}
+
+		std::unique_ptr<string> decode(string s)
+		{
+
+		}
+
+		void showCode(size_t n = 0)
+		{
+			if (!n)
+				n = _pBitSet2Data->size();
+			size_t k = 0;
+			for (auto it = _pBitSet2Data->begin(); it != _pBitSet2Data->end() && k != n; it++, k++)
+			{
+				for (auto i = it->first.begin(), end = it->first.end(); i != end; i++)
+				{
+					cout << *i;
+				}
+				cout << ": ";
+				uint64_t v = 0;
+				char j = _nUnitBytes - 1;
+				for (unsigned char s : it->second)
+				{
+					v += (s << (j * 8));
+					j++;
+				}
+				cout << v << endl;
+			}
+		}
+
+	private:
+		std::unique_ptr<BMap> _pBitSet2Data;
+		char _nDataFillBytes;
+		char _nCodeFillBits;
+		char _nUnitBytes;
+	};
+
+
 	class _BaseZCompresser
 	{
 	public:
@@ -360,10 +455,23 @@ namespace lyf
 		void compress(string src, string dst, uint8_t level = 9)
 		{
 			_pEncoder->encode(src, dst);
-			//_pEncoder->showCodes(100);
-			cout << _pEncoder->CompressionRate() << endl;
-			//string header = _pEncoder->getHeader();
-			//cout << header.size() << endl;
+			_pEncoder->showCodes(100);
+			//cout << _pEncoder->CompressionRate() << endl;
+			string header = _pEncoder->getHeader();
+			size_t compressedSize = header.size() + fileSize(dst);
+			//cout << compressedSize/1024 << endl;
+			//cout << static_cast<double>(compressedSize) / fileSize(src) << endl;
+			HuffmanDecoder decoder(header);
+			decoder.showCode();
+		}
+
+		size_t fileSize(string filename)
+		{
+			std::ifstream inf(filename, std::ifstream::binary);
+			if (!inf)
+				throw std::runtime_error("The file does not exist");
+			inf.seekg(0, std::ifstream::end);
+			return inf.tellg();
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
