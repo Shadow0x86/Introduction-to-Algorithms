@@ -10,6 +10,15 @@
 namespace lyf
 {
 
+	size_t fileSize(string filename)
+	{
+		std::ifstream inf(filename, std::ifstream::binary);
+		if (!inf)
+			throw std::runtime_error("The file does not exist");
+		inf.seekg(0, std::ifstream::end);
+		return inf.tellg();
+	}
+
 	template<typename Unit>
 	class HuffmanEncoder
 	{
@@ -87,6 +96,9 @@ namespace lyf
 				throw std::runtime_error("Fail to create or open the dst file.");
 			outf.sync_with_stdio(false);
 			this->_readFile(inf, cnt, rest, [&]() { this->_flushToFile(outf); });
+
+			inf.close();
+			outf.close();
 		}
 
 		std::unique_ptr<string> encode(const string &s)
@@ -344,7 +356,7 @@ namespace lyf
 
 		HuffmanDecoder()
 			: _pBitSet2Data(nullptr), _nDataFillBytes(0), _nCodeFillBits(0),
-			_nUnitBytes(0)
+			  _nUnitBytes(0), _pBuffer(new char[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
 
@@ -391,10 +403,37 @@ namespace lyf
 
 		void decode(string src, string dst)
 		{
-
+			std::ifstream inf(src, std::ifstream::binary);
+			if (!inf)
+				throw std::runtime_error("The file does not exist");
+			inf.seekg(0, std::ifstream::end);
+			uint64_t nSrcBytes = inf.tellg();
+			uint64_t nSrcBits = nSrcBytes * 8 - _nCodeFillBits;
+			inf.seekg(0);
+			std::ofstream outf(dst, std::ofstream::binary);
+			if (!outf)
+				throw std::runtime_error("Fail to create or open the dst file");
+			size_t cnt = nSrcBits / (_MAX_BUFF_SIZE * 8);
+			for (size_t i = 0; i != cnt; i++)
+			{
+				inf.read(_pBuffer.get(), _MAX_BUFF_SIZE);
+				_BuffSize = _MAX_BUFF_SIZE;
+				_flushToFile(outf);
+			}
+			uint64_t restBits = nSrcBits - cnt * _MAX_BUFF_SIZE * 8;
+			if (restBits)
+			{
+				uint64_t restBytes = (restBits + 7) / 8;
+				inf.read(_pBuffer.get(), restBytes);
+				_BuffSize = restBytes;
+				_flushToFile(outf, restBits);
+			}
+			//TODO: 处理不足Unit的字节
+			inf.close();
+			outf.close();
 		}
 
-		std::unique_ptr<string> decode(string s)
+		std::unique_ptr<string> decode(const string &s)
 		{
 
 		}
@@ -423,10 +462,41 @@ namespace lyf
 		}
 
 	private:
+		inline static size_t const _MAX_BUFF_SIZE = 4096;
 		std::unique_ptr<BMap> _pBitSet2Data;
 		char _nDataFillBytes;
 		char _nCodeFillBits;
 		char _nUnitBytes;
+		std::unique_ptr<char[]> _pBuffer;
+		size_t _BuffSize;
+		BitSet _bs;
+
+		void _flushToFile(std::ofstream &outf, uint64_t maxBits = 0)
+		{
+			if (!maxBits)
+				maxBits = _BuffSize * 8;
+			size_t i = 0;
+			uint64_t bits = 0;
+			unsigned char flag = 128;
+			while (i != _BuffSize && bits != maxBits)
+			{
+				_bs.push_back(_pBuffer[i] & flag);
+				if (_pBitSet2Data->find(_bs) != _pBitSet2Data->end())
+				{
+					const string &s = (*_pBitSet2Data)[_bs];
+					outf.write(s.data(), _nUnitBytes);
+					_bs.clear();
+				}
+				bits++;
+				flag /= 2;
+				if (!flag)
+				{
+					flag = 128;
+					i++;
+				}
+			}
+			_BuffSize = 0;
+		}
 	};
 
 
@@ -453,24 +523,18 @@ namespace lyf
 
 		void compress(string src, string dst, uint8_t level = 9)
 		{
+			cout << "start encoding..." << endl;
 			_pEncoder->encode(src, dst);
-			_pEncoder->showCodes(100);
+			//_pEncoder->showCodes(100);
 			//cout << _pEncoder->CompressionRate() << endl;
 			string header = _pEncoder->getHeader();
 			size_t compressedSize = header.size() + fileSize(dst);
 			//cout << compressedSize/1024 << endl;
 			//cout << static_cast<double>(compressedSize) / fileSize(src) << endl;
 			HuffmanDecoder decoder(header);
-			decoder.showCode();
-		}
-
-		size_t fileSize(string filename)
-		{
-			std::ifstream inf(filename, std::ifstream::binary);
-			if (!inf)
-				throw std::runtime_error("The file does not exist");
-			inf.seekg(0, std::ifstream::end);
-			return inf.tellg();
+			cout << "start decoding..." << endl;
+			decoder.decode("encoded", "fuck1.dat");
+			//decoder.showCode(100);
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
