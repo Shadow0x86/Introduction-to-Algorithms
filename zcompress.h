@@ -1,5 +1,6 @@
 #pragma once
 #include <fstream>
+#include <sstream>
 #include <iostream>
 #include <cstdint>
 #include <vector>
@@ -76,29 +77,32 @@ namespace lyf
 
 		void encode(const string &srcfile, const string &dstfile)
 		{
-			// read the src file data to buffer
 			std::ifstream inf(srcfile, std::ifstream::binary);
 			if (!inf)
 				throw std::runtime_error("The src file does not exist.");
-			this->reset();
-			inf.sync_with_stdio(false);
-			inf.seekg(0, std::ifstream::end);
-			_nDataTotalBytes = inf.tellg();
-			const size_t cnt = _nDataTotalBytes / _MAX_BUFF_SIZE;
-			const size_t rest = _nDataTotalBytes - cnt * _MAX_BUFF_SIZE;
-
-			this->_readFile(inf, cnt, rest, [&]() { this->_flushToTree(); });
-
-			_generate();
-
 			std::ofstream outf(dstfile, std::ofstream::binary);
 			if (!outf)
 				throw std::runtime_error("Fail to create or open the dst file.");
-			outf.sync_with_stdio(false);
-			this->_readFile(inf, cnt, rest, [&]() { this->_flushToFile(outf); });
+			
+			this->encode(inf, outf);
 
 			inf.close();
 			outf.close();
+		}
+
+		void encode(std::istream &in, std::ostream &out)
+		{
+			this->reset();
+			in.seekg(0, std::ifstream::end);
+			_nDataTotalBytes = in.tellg();
+			const size_t cnt = _nDataTotalBytes / _MAX_BUFF_SIZE;
+			const size_t rest = _nDataTotalBytes - cnt * _MAX_BUFF_SIZE;
+
+			this->_readStream(in, cnt, rest, [&]() { this->_flushToTree(); });
+
+			_generate();
+
+			this->_readStream(in, cnt, rest, [&]() { this->_flushToStream(out); });
 		}
 
 		std::unique_ptr<string> encode(const string &s)
@@ -216,18 +220,18 @@ namespace lyf
 		double _CompressionRate;
 
 		template<typename Func>
-		void _readFile(std::ifstream &inf, size_t cnt, size_t rest, Func flush)
+		void _readStream(std::istream &in, size_t cnt, size_t rest, Func flush)
 		{
-			inf.seekg(0);
+			in.seekg(0);
 			for (size_t i = 0; i != cnt; i++)
 			{
-				inf.read(_pBuffer.get(), _MAX_BUFF_SIZE);
+				in.read(_pBuffer.get(), _MAX_BUFF_SIZE);
 				_BuffSize = _MAX_BUFF_SIZE;
 				flush();
 			}
 			if (rest)
 			{
-				inf.read(_pBuffer.get(), rest);
+				in.read(_pBuffer.get(), rest);
 				_BuffSize = rest;
 				flush();
 			}
@@ -287,7 +291,7 @@ namespace lyf
 			_BuffSize = 0;
 		}
 
-		void _flushToFile(std::ofstream &outf)
+		void _flushToStream(std::ostream &out)
 		{
 			auto size = _BuffSize / sizeof Unit;
 			auto rest = _BuffSize - size * sizeof Unit;
@@ -320,7 +324,7 @@ namespace lyf
 				s.push_back(c);
 				_nCodeFillBits = 8 - pos;
 			}
-			outf.write(s.data(), s.size());
+			out.write(s.data(), s.size());
 			_BuffSize = 0;
 		}
 
@@ -524,19 +528,26 @@ namespace lyf
 		{
 		}
 
-		void compress(string src, string dst, uint8_t level = 9)
+		void compress(const string &src, const string &dst, uint8_t level = 9)
 		{
 			cout << "start encoding..." << endl;
-			_pEncoder->encode(src, dst);
-			//_pEncoder->showCodes(100);
-			//cout << _pEncoder->CompressionRate() << endl;
+			std::ifstream in(src, std::ifstream::binary);
+			std::ostringstream outs;
+			std::ofstream outf(dst, std::ofstream::binary);
+			in.sync_with_stdio(false);
+			outs.sync_with_stdio(false);
+			outf.sync_with_stdio(false);
+			_pEncoder->encode(in, outs);
 			const string &header = _pEncoder->getHeader();
-			size_t compressedSize = header.size() + fileSize(dst);
+			outf.write(header.data(), header.size());
+			outf.write(outs.str().data(), outs.str().size());
+			
+			//size_t compressedSize = header.size() + fileSize(dst);
 			//cout << compressedSize/1024 << endl;
 			//cout << static_cast<double>(compressedSize) / fileSize(src) << endl;
-			HuffmanDecoder decoder(header);
-			cout << "start decoding..." << endl;
-			decoder.decode("encoded", "fuck1.dat");
+			//HuffmanDecoder decoder(header);
+			//cout << "start decoding..." << endl;
+			//decoder.decode("encoded", "fuck1.dat");
 			//decoder.showCode(100);
 		}
 
