@@ -11,25 +11,36 @@
 namespace lyf
 {
 
-	size_t fileSize(string filename)
+	uint64_t fileSize(string filename)
 	{
 		std::ifstream inf(filename, std::ifstream::binary);
 		if (!inf)
 			throw std::runtime_error("The file does not exist");
 		inf.seekg(0, std::ifstream::end);
-		size_t ret = inf.tellg();
+		uint64_t ret = inf.tellg();
 		inf.close();
 		return ret;
 	}
 
-	size_t fileSize(std::fstream &f)
+	uint64_t fileSize(std::ifstream &f)
 	{
 		if (!f)
 			throw std::runtime_error("The file does not exist");
 		auto x = f.tellg();
 		f.seekg(0, std::fstream::end);
-		size_t ret = f.tellg();
+		uint64_t ret = f.tellg();
 		f.seekg(x);
+		return ret;
+	}
+
+	uint64_t fileSize(std::ofstream &f)
+	{
+		if (!f)
+			throw std::runtime_error("The file does not exist");
+		auto x = f.tellp();
+		f.seekp(0, std::fstream::end);
+		uint64_t ret = f.tellp();
+		f.seekp(x);
 		return ret;
 	}
 
@@ -515,15 +526,53 @@ namespace lyf
 		{
 		}
 
-		void compress(const string &src, const string &dst, uint8_t level = 9)
+		void compress(const string &src, const string &dst = "", uint8_t level = 9)
 		{
-			std::ifstream in(src, std::ifstream::binary);
+			if (level < 1 || level > 9)
+				throw std::runtime_error("level must be between 1 and 9");
+			string infilename = src, outfilename = ".out1.tmp";
+			std::ifstream in;
 			std::ostringstream outs;
-			std::ofstream outf(dst, std::ofstream::binary);
-			_pEncoder->encode(in, outs);
-			const string &header = _pEncoder->getHeader();
-			outf.write(header.data(), header.size());
-			outf.write(outs.str().data(), outs.str().size());
+			std::ofstream outf;
+			uint8_t lv = 1;
+			uint64_t oldsize, newsize;
+			vector<string> toremove;
+			while (lv++ <= level)
+			{
+				in.open(infilename, std::ifstream::binary);
+				oldsize = fileSize(in);
+				outf.open(outfilename, std::ofstream::binary);
+				_pEncoder->encode(in, outs);
+				const string &header = _pEncoder->getHeader();
+				outf.write(reinterpret_cast<char*>(&lv), 1);
+				unsigned int hsize = header.size();
+				outf.write(reinterpret_cast<char*>(&hsize), 4);
+				outf.write(header.data(), header.size());
+				outf.write(outs.str().data(), outs.str().size());
+				newsize = fileSize(outf);
+				if (newsize >= oldsize)
+				{
+					toremove.push_back(outfilename);
+					outfilename = infilename;
+					in.close();
+					outf.close();
+					break;
+				}
+				if (infilename != src)
+					toremove.push_back(infilename);
+				infilename = outfilename;
+				outfilename.replace(4, 1, 1, lv + 48);
+				in.clear();
+				in.close();
+				outf.clear();
+				outf.close();
+				outs.clear();
+				outs.str("");
+			}
+			toremove.push_back(dst);
+			for (auto &f : toremove)
+				remove(f.c_str());
+			rename(outfilename.c_str(), dst.c_str());
 			
 			//size_t compressedSize = header.size() + fileSize(dst);
 			//cout << compressedSize/1024 << endl;
