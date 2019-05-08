@@ -17,7 +17,20 @@ namespace lyf
 		if (!inf)
 			throw std::runtime_error("The file does not exist");
 		inf.seekg(0, std::ifstream::end);
-		return inf.tellg();
+		size_t ret = inf.tellg();
+		inf.close();
+		return ret;
+	}
+
+	size_t fileSize(std::fstream &f)
+	{
+		if (!f)
+			throw std::runtime_error("The file does not exist");
+		auto x = f.tellg();
+		f.seekg(0, std::fstream::end);
+		size_t ret = f.tellg();
+		f.seekg(x);
+		return ret;
 	}
 
 	template<typename Unit>
@@ -97,17 +110,9 @@ namespace lyf
 			_nDataTotalBytes = in.tellg();
 			const size_t cnt = _nDataTotalBytes / _MAX_BUFF_SIZE;
 			const size_t rest = _nDataTotalBytes - cnt * _MAX_BUFF_SIZE;
-
 			this->_readStream(in, cnt, rest, [&]() { this->_flushToTree(); });
-
-			_generate();
-
+			this->_generate();
 			this->_readStream(in, cnt, rest, [&]() { this->_flushToStream(out); });
-		}
-
-		std::unique_ptr<string> encode(const string &s)
-		{
-			// TODO
 		}
 
 		BitSet getCode(Unit data) const
@@ -159,25 +164,6 @@ namespace lyf
 			}
 			return *(this->_pHeader);
 		}
-
-		//double CompressionRate() const
-		//{
-		//	return const_cast<HuffmanEncoder*>(this)->CompressionRate();
-		//}
-
-		//double CompressionRate()
-		//{
-		//	if (this->_CompressionRate < 0)
-		//	{
-		//		uint64_t compressedSize = 0;
-		//		for (auto it = _pUnit2Node->begin(); it != _pUnit2Node->end(); it++)
-		//		{
-		//			compressedSize += (it->second->freq * (*_pUnit2BitSet)[it->first]->size());
-		//		}
-		//		this->_CompressionRate = static_cast<double>(compressedSize + 7) / 8 / this->_DataTotalSize;
-		//	}
-		//	return this->_CompressionRate;
-		//}
 
 		void reset()
 		{
@@ -405,39 +391,40 @@ namespace lyf
 
 		void decode(const string &src, const string &dst)
 		{
-			_nRestBytes = _nDataTotalBytes;
+			
 			std::ifstream inf(src, std::ifstream::binary);
 			if (!inf)
 				throw std::runtime_error("The file does not exist");
-			inf.seekg(0, std::ifstream::end);
-			uint64_t nSrcBytes = inf.tellg();
-			uint64_t nSrcBits = nSrcBytes * 8 - _nCodeFillBits;
-			inf.seekg(0);
 			std::ofstream outf(dst, std::ofstream::binary);
 			if (!outf)
 				throw std::runtime_error("Fail to create or open the dst file");
+			this->decode(inf, outf);
+			inf.close();
+			outf.close();
+		}
+
+		void decode(std::istream &in, std::ostream &out)
+		{
+			_nRestBytes = _nDataTotalBytes;
+			in.seekg(0, std::ifstream::end);
+			uint64_t nSrcBytes = in.tellg();
+			in.seekg(0);
+			uint64_t nSrcBits = nSrcBytes * 8 - _nCodeFillBits;
 			size_t cnt = nSrcBits / (_MAX_BUFF_SIZE * 8);
 			for (size_t i = 0; i != cnt; i++)
 			{
-				inf.read(_pBuffer.get(), _MAX_BUFF_SIZE);
+				in.read(_pBuffer.get(), _MAX_BUFF_SIZE);
 				_BuffSize = _MAX_BUFF_SIZE;
-				_flushToFile(outf);
+				_flushToStream(out);
 			}
 			uint64_t restBits = nSrcBits - cnt * _MAX_BUFF_SIZE * 8;
 			if (restBits)
 			{
 				uint64_t restBytes = (restBits + 7) / 8;
-				inf.read(_pBuffer.get(), restBytes);
+				in.read(_pBuffer.get(), restBytes);
 				_BuffSize = restBytes;
-				_flushToFile(outf, restBits);
+				_flushToStream(out, restBits);
 			}
-			inf.close();
-			outf.close();
-		}
-
-		std::unique_ptr<string> decode(const string &s)
-		{
-
 		}
 
 		void showCode(size_t n = 0)
@@ -474,7 +461,7 @@ namespace lyf
 		size_t _BuffSize;
 		BitSet _bs;
 
-		void _flushToFile(std::ofstream &outf, uint64_t maxBits = 0)
+		void _flushToStream(std::ostream &out, uint64_t maxBits = 0)
 		{
 			if (!maxBits)
 				maxBits = _BuffSize * 8;
@@ -488,7 +475,7 @@ namespace lyf
 				{
 					const string &s = (*_pBitSet2Data)[_bs];
 					char nw = std::min(_nRestBytes, static_cast<uint64_t>(_nUnitBytes));
-					outf.write(s.data(), nw);
+					out.write(s.data(), nw);
 					_nRestBytes -= nw;
 					_bs.clear();
 					if (!_nRestBytes)
@@ -530,13 +517,9 @@ namespace lyf
 
 		void compress(const string &src, const string &dst, uint8_t level = 9)
 		{
-			cout << "start encoding..." << endl;
 			std::ifstream in(src, std::ifstream::binary);
 			std::ostringstream outs;
 			std::ofstream outf(dst, std::ofstream::binary);
-			in.sync_with_stdio(false);
-			outs.sync_with_stdio(false);
-			outf.sync_with_stdio(false);
 			_pEncoder->encode(in, outs);
 			const string &header = _pEncoder->getHeader();
 			outf.write(header.data(), header.size());
@@ -554,7 +537,6 @@ namespace lyf
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
 
 	private:
-		inline static const double _NoDeepFactor = 0.98;
 		std::unique_ptr<Encoder> _pEncoder;
 	};
 
