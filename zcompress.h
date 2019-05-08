@@ -65,8 +65,8 @@ namespace lyf
 
 	public:
 		HuffmanEncoder()
-			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _DataTotalSize(0),
-			  _nDataFillBytes(0), _nCodeFillBits(0), _CompressionRate(-1), _pHeader(nullptr),
+			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _nDataTotalBytes(0),
+			  _nCodeFillBits(0), _CompressionRate(-1), _pHeader(nullptr),
 			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
@@ -74,7 +74,7 @@ namespace lyf
 		HuffmanEncoder(const HuffmanEncoder &) = delete;
 		HuffmanEncoder &operator=(const HuffmanEncoder &) = delete;
 
-		void encode(string srcfile, string dstfile)
+		void encode(const string &srcfile, const string &dstfile)
 		{
 			// read the src file data to buffer
 			std::ifstream inf(srcfile, std::ifstream::binary);
@@ -83,9 +83,9 @@ namespace lyf
 			this->reset();
 			inf.sync_with_stdio(false);
 			inf.seekg(0, std::ifstream::end);
-			size_t fsize = inf.tellg();
-			const size_t cnt = fsize / _MAX_BUFF_SIZE;
-			const size_t rest = fsize - cnt * _MAX_BUFF_SIZE;
+			_nDataTotalBytes = inf.tellg();
+			const size_t cnt = _nDataTotalBytes / _MAX_BUFF_SIZE;
+			const size_t rest = _nDataTotalBytes - cnt * _MAX_BUFF_SIZE;
 
 			this->_readFile(inf, cnt, rest, [&]() { this->_flushToTree(); });
 
@@ -116,12 +116,14 @@ namespace lyf
 			return const_cast<HuffmanEncoder*>(this)->getHeader();
 		}
 
-		string getHeader()
+		const string &getHeader()
 		{
 			if (!this->_pHeader)
 			{
 				this->_pHeader.reset(new string);
-				this->_pHeader->push_back(_nDataFillBytes);
+				auto cp = reinterpret_cast<const char*>(&_nDataTotalBytes);
+				for (int i = 0; i != 8; i++)
+					this->_pHeader->push_back(cp[i]);
 				this->_pHeader->push_back(_nCodeFillBits);
 				char nDataUnitBytes = sizeof Unit;
 				this->_pHeader->push_back(nDataUnitBytes);
@@ -180,9 +182,8 @@ namespace lyf
 			_pUnit2BitSet->clear();
 			_BuffSize = 0;
 			_pHeader.reset();
-			_nDataFillBytes = 0;
+			_nDataTotalBytes = 0;
 			_nCodeFillBits = 0;
-			_DataTotalSize = 0;
 			_CompressionRate = -1;
 		}
 
@@ -210,9 +211,8 @@ namespace lyf
 		std::unique_ptr<Buff_t[]> _pBuffer;
 		size_t _BuffSize;
 		std::unique_ptr<string> _pHeader;
-		char _nDataFillBytes;
+		uint64_t _nDataTotalBytes;
 		char _nCodeFillBits;
-		uint64_t _DataTotalSize;
 		double _CompressionRate;
 
 		template<typename Func>
@@ -270,7 +270,6 @@ namespace lyf
 			auto rest = _BuffSize - size * sizeof Unit;
 			if (rest)
 			{
-				_nDataFillBytes = sizeof Unit - rest;
 				char *cp = _pBuffer.get() + _BuffSize;
 				for (size_t i = 0, len = sizeof Unit - rest; i != len; i++)
 					cp[i] = 0;
@@ -285,7 +284,6 @@ namespace lyf
 				else
 					(*_pUnit2Node)[v]->freq++;
 			}
-			_DataTotalSize += _BuffSize;
 			_BuffSize = 0;
 		}
 
@@ -355,24 +353,24 @@ namespace lyf
 		using BMap = std::unordered_map<BitSet, string>;
 
 		HuffmanDecoder()
-			: _pBitSet2Data(nullptr), _nDataFillBytes(0), _nCodeFillBits(0),
+			: _pBitSet2Data(nullptr), _nDataTotalBytes(0), _nRestBytes(0), _nCodeFillBits(0),
 			  _nUnitBytes(0), _pBuffer(new char[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
 
-		HuffmanDecoder(string header)
+		HuffmanDecoder(const string &header)
 			: HuffmanDecoder()
 		{
 			this->setHeader(header);
 		}
 
-		void setHeader(string header)
+		void setHeader(const string &header)
 		{
 			_pBitSet2Data.reset(new BMap());
-			_nDataFillBytes = header[0];
-			_nCodeFillBits = header[1];
-			_nUnitBytes = header[2];
-			size_t pos = 3;
+			_nDataTotalBytes = *reinterpret_cast<const uint64_t*>(header.data());
+			_nCodeFillBits = header[8];
+			_nUnitBytes = header[9];
+			size_t pos = 10;
 			while (pos != header.size())
 			{
 				size_t nCodeBits = 0;
@@ -401,8 +399,9 @@ namespace lyf
 			}
 		}
 
-		void decode(string src, string dst)
+		void decode(const string &src, const string &dst)
 		{
+			_nRestBytes = _nDataTotalBytes;
 			std::ifstream inf(src, std::ifstream::binary);
 			if (!inf)
 				throw std::runtime_error("The file does not exist");
@@ -428,7 +427,6 @@ namespace lyf
 				_BuffSize = restBytes;
 				_flushToFile(outf, restBits);
 			}
-			//TODO: 处理不足Unit的字节
 			inf.close();
 			outf.close();
 		}
@@ -464,7 +462,8 @@ namespace lyf
 	private:
 		inline static size_t const _MAX_BUFF_SIZE = 4096;
 		std::unique_ptr<BMap> _pBitSet2Data;
-		char _nDataFillBytes;
+		uint64_t _nDataTotalBytes;
+		uint64_t _nRestBytes;
 		char _nCodeFillBits;
 		char _nUnitBytes;
 		std::unique_ptr<char[]> _pBuffer;
@@ -484,8 +483,12 @@ namespace lyf
 				if (_pBitSet2Data->find(_bs) != _pBitSet2Data->end())
 				{
 					const string &s = (*_pBitSet2Data)[_bs];
-					outf.write(s.data(), _nUnitBytes);
+					char nw = std::min(_nRestBytes, static_cast<uint64_t>(_nUnitBytes));
+					outf.write(s.data(), nw);
+					_nRestBytes -= nw;
 					_bs.clear();
+					if (!_nRestBytes)
+						break;
 				}
 				bits++;
 				flag /= 2;
@@ -527,7 +530,7 @@ namespace lyf
 			_pEncoder->encode(src, dst);
 			//_pEncoder->showCodes(100);
 			//cout << _pEncoder->CompressionRate() << endl;
-			string header = _pEncoder->getHeader();
+			const string &header = _pEncoder->getHeader();
 			size_t compressedSize = header.size() + fileSize(dst);
 			//cout << compressedSize/1024 << endl;
 			//cout << static_cast<double>(compressedSize) / fileSize(src) << endl;
