@@ -91,8 +91,8 @@ namespace lyf
 	public:
 		HuffmanEncoder()
 			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _nDataTotalBytes(0),
-			  _nCodeFillBits(0), _CompressionRate(-1), _pHeader(nullptr),
-			  _pRoot(nullptr), _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
+			  _nCodeFillBits(0), _pHeader(nullptr), _pRoot(nullptr), 
+			  _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
 
@@ -117,12 +117,15 @@ namespace lyf
 		void encode(std::istream &in, std::ostream &out)
 		{
 			this->reset();
+			uint64_t start = in.tellg();
 			in.seekg(0, std::ifstream::end);
-			_nDataTotalBytes = in.tellg();
+			_nDataTotalBytes = static_cast<uint64_t>(in.tellg()) - start;
+			in.seekg(start);
 			const size_t cnt = _nDataTotalBytes / _MAX_BUFF_SIZE;
 			const size_t rest = _nDataTotalBytes - cnt * _MAX_BUFF_SIZE;
 			this->_readStream(in, cnt, rest, [&]() { this->_flushToTree(); });
 			this->_generate();
+			in.seekg(start);
 			this->_readStream(in, cnt, rest, [&]() { this->_flushToStream(out); });
 		}
 
@@ -185,7 +188,6 @@ namespace lyf
 			_pHeader.reset();
 			_nDataTotalBytes = 0;
 			_nCodeFillBits = 0;
-			_CompressionRate = -1;
 		}
 
 		void showCodes(size_t n = 0)
@@ -214,12 +216,10 @@ namespace lyf
 		std::unique_ptr<string> _pHeader;
 		uint64_t _nDataTotalBytes;
 		char _nCodeFillBits;
-		double _CompressionRate;
 
 		template<typename Func>
 		void _readStream(std::istream &in, size_t cnt, size_t rest, Func flush)
 		{
-			in.seekg(0);
 			for (size_t i = 0; i != cnt; i++)
 			{
 				in.read(_pBuffer.get(), _MAX_BUFF_SIZE);
@@ -417,9 +417,10 @@ namespace lyf
 		void decode(std::istream &in, std::ostream &out)
 		{
 			_nRestBytes = _nDataTotalBytes;
+			uint64_t start = in.tellg();
 			in.seekg(0, std::ifstream::end);
-			uint64_t nSrcBytes = in.tellg();
-			in.seekg(0);
+			uint64_t nSrcBytes = static_cast<uint64_t>(in.tellg()) - start;
+			in.seekg(start);
 			uint64_t nSrcBits = nSrcBytes * 8 - _nCodeFillBits;
 			size_t cnt = nSrcBits / (_MAX_BUFF_SIZE * 8);
 			for (size_t i = 0; i != cnt; i++)
@@ -505,19 +506,8 @@ namespace lyf
 	};
 
 
-	class _BaseZCompresser
-	{
-	public:
-		
-	private:
-		static const char * const _FilenameSuffix;
-	};
-
-	const char * const _BaseZCompresser::_FilenameSuffix = ".zc";
-
-
 	template<typename Encoder>
-	class ZCompresser : public _BaseZCompresser
+	class ZCompresser
 	{
 	public:
 		template<typename... EncoderArgs>
@@ -530,30 +520,35 @@ namespace lyf
 		{
 			if (level < 1 || level > 9)
 				throw std::runtime_error("level must be between 1 and 9");
-			string infilename = src, outfilename = ".out1.tmp";
+			string infilename = src, outfilename = ".encode1.tmp";
 			std::ifstream in;
 			std::ostringstream outs;
 			std::ofstream outf;
 			uint8_t lv = 1;
 			uint64_t oldsize, newsize;
 			vector<string> toremove;
-			while (lv++ <= level)
+			while (lv <= level)
 			{
 				in.open(infilename, std::ifstream::binary);
 				oldsize = fileSize(in);
 				outf.open(outfilename, std::ofstream::binary);
+				_pEncoder->reset();
 				_pEncoder->encode(in, outs);
 				const string &header = _pEncoder->getHeader();
 				outf.write(reinterpret_cast<char*>(&lv), 1);
 				unsigned int hsize = header.size();
+				cout << int(lv) << ":" << hsize << endl;
 				outf.write(reinterpret_cast<char*>(&hsize), 4);
 				outf.write(header.data(), header.size());
 				outf.write(outs.str().data(), outs.str().size());
 				newsize = fileSize(outf);
 				if (newsize >= oldsize)
 				{
-					toremove.push_back(outfilename);
-					outfilename = infilename;
+					if (infilename != src)
+					{
+						toremove.push_back(outfilename);
+						outfilename = infilename;
+					}
 					in.close();
 					outf.close();
 					break;
@@ -561,7 +556,7 @@ namespace lyf
 				if (infilename != src)
 					toremove.push_back(infilename);
 				infilename = outfilename;
-				outfilename.replace(4, 1, 1, lv + 48);
+				outfilename.replace(7, 1, 1, ++lv + 48);
 				in.clear();
 				in.close();
 				outf.clear();
@@ -574,13 +569,6 @@ namespace lyf
 				remove(f.c_str());
 			rename(outfilename.c_str(), dst.c_str());
 			
-			//size_t compressedSize = header.size() + fileSize(dst);
-			//cout << compressedSize/1024 << endl;
-			//cout << static_cast<double>(compressedSize) / fileSize(src) << endl;
-			//HuffmanDecoder decoder(header);
-			//cout << "start decoding..." << endl;
-			//decoder.decode("encoded", "fuck1.dat");
-			//decoder.showCode(100);
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
@@ -592,8 +580,54 @@ namespace lyf
 	using HuffmanCompresser = ZCompresser<HuffmanEncoder<uint64_t>>;
 
 
-	class ZDecompresser : public _BaseZCompresser
+	template<typename Decoder>
+	class ZDecompresser
 	{
-		void decompress(string file);
+	public:
+		template<typename... DecoderArgs>
+		ZDecompresser(DecoderArgs&&... args)
+			: _pDecoder(new Decoder(std::forward<DecoderArgs>(args)...))
+		{
+		}
+
+		void decompress(const string &src)
+		{
+			string infilename = src, outfilename = ".decode1.tmp";
+			std::ifstream in;
+			std::ofstream outf;
+			vector<string> toremove;
+			char lv, i = 1;
+			unsigned int hsize;
+			while (true)
+			{
+				in.open(infilename, std::ifstream::binary);
+				outf.open(outfilename, std::ofstream::binary);
+				in.read(&lv, 1);
+				in.read(reinterpret_cast<char*>(&hsize), 4);
+				cout << int(lv) << ":" << hsize << endl;
+				string header;
+				header.resize(hsize);
+				in.read(header.data(), hsize);
+				_pDecoder->setHeader(header);
+				_pDecoder->decode(in, outf);
+				in.clear();
+				in.close();
+				outf.clear();
+				outf.close();
+				if (infilename != src)
+					toremove.push_back(infilename);
+				if (lv == 1)
+					break;
+				infilename = outfilename;
+				outfilename.replace(7, 1, 1, ++i + 48);
+			}
+			for (auto &f : toremove)
+				remove(f.c_str());
+		}
+
+	private:
+		std::unique_ptr<Decoder> _pDecoder;
 	};
+
+	using HuffmanDecompresser = ZDecompresser<HuffmanDecoder>;
 }
