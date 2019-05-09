@@ -91,7 +91,7 @@ namespace lyf
 	public:
 		HuffmanEncoder()
 			: _pUnit2Node(new NMap()), _pUnit2BitSet(new BMap()), _nDataTotalBytes(0),
-			  _nCodeFillBits(0), _pHeader(nullptr), _pRoot(nullptr), 
+			  _nCodeFillBits(0), _pHeader(nullptr), _pRoot(nullptr), _c(0), _pos(0),
 			  _pBuffer(new Buff_t[_MAX_BUFF_SIZE]), _BuffSize(0)
 		{
 		}
@@ -216,6 +216,9 @@ namespace lyf
 		std::unique_ptr<string> _pHeader;
 		uint64_t _nDataTotalBytes;
 		char _nCodeFillBits;
+		string _s;
+		char _c;
+		char _pos;
 
 		template<typename Func>
 		void _readStream(std::istream &in, size_t cnt, size_t rest, Func flush)
@@ -300,28 +303,27 @@ namespace lyf
 				size++;
 			}
 			Unit *p = reinterpret_cast<Unit*>(_pBuffer.get());
-			string s;
-			char c = 0, pos = 0;
 			for (size_t i = 0; i != size; i++)
 			{
 				const BitSet &bs = *((*_pUnit2BitSet)[p[i]]);
 				for (auto it = bs.begin(); it != bs.end(); it++)
 				{
-					c += ((*it) << (7 - pos));
-					if (++pos == 8)
+					_c += ((*it) << (7 - _pos));
+					if (++_pos == 8)
 					{
-						pos = 0;
-						s.push_back(c);
-						c = 0;
+						_pos = 0;
+						_s.push_back(_c);
+						_c = 0;
 					}
 				}
 			}
-			if (pos)
+			if (rest && _pos)
 			{
-				s.push_back(c);
-				_nCodeFillBits = 8 - pos;
+				_s.push_back(_c);
+				_nCodeFillBits = 8 - _pos;
 			}
-			out.write(s.data(), s.size());
+			out.write(_s.data(), _s.size());
+			_s.clear();
 			_BuffSize = 0;
 		}
 
@@ -486,7 +488,7 @@ namespace lyf
 				if (_pBitSet2Data->find(_bs) != _pBitSet2Data->end())
 				{
 					const string &s = (*_pBitSet2Data)[_bs];
-					char nw = std::min(_nRestBytes, static_cast<uint64_t>(_nUnitBytes));
+					uint64_t nw = std::min(_nRestBytes, static_cast<uint64_t>(_nUnitBytes));
 					out.write(s.data(), nw);
 					_nRestBytes -= nw;
 					_bs.clear();
@@ -537,7 +539,7 @@ namespace lyf
 				const string &header = _pEncoder->getHeader();
 				outf.write(reinterpret_cast<char*>(&lv), 1);
 				unsigned int hsize = header.size();
-				cout << int(lv) << ":" << hsize << endl;
+				//cout << int(lv) << ":" << hsize << endl;
 				outf.write(reinterpret_cast<char*>(&hsize), 4);
 				outf.write(header.data(), header.size());
 				outf.write(outs.str().data(), outs.str().size());
@@ -568,6 +570,7 @@ namespace lyf
 			for (auto &f : toremove)
 				remove(f.c_str());
 			rename(outfilename.c_str(), dst.c_str());
+			//_pEncoder->showCodes();
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
@@ -603,7 +606,7 @@ namespace lyf
 				outf.open(outfilename, std::ofstream::binary);
 				in.read(&lv, 1);
 				in.read(reinterpret_cast<char*>(&hsize), 4);
-				cout << int(lv) << ":" << hsize << endl;
+				//cout << int(lv) << ":" << hsize << endl;
 				string header;
 				header.resize(hsize);
 				in.read(header.data(), hsize);
