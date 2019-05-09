@@ -122,11 +122,18 @@ namespace lyf
 			_nDataTotalBytes = static_cast<uint64_t>(in.tellg()) - start;
 			in.seekg(start);
 			const size_t cnt = _nDataTotalBytes / _MAX_BUFF_SIZE;
-			const size_t rest = _nDataTotalBytes - cnt * _MAX_BUFF_SIZE;
+			const size_t rest = _nDataTotalBytes % _MAX_BUFF_SIZE;
 			this->_readStream(in, cnt, rest, [&]() { this->_flushToTree(); });
 			this->_generate();
 			in.seekg(start);
 			this->_readStream(in, cnt, rest, [&]() { this->_flushToStream(out); });
+			if (_pos)
+			{
+				out.write(&_c, 1);
+				_nCodeFillBits = 8 - _pos;
+				_c = 0;
+				_pos = 0;
+			}
 		}
 
 		BitSet getCode(Unit data) const
@@ -271,7 +278,7 @@ namespace lyf
 		void _flushToTree()
 		{
 			auto size = _BuffSize / sizeof Unit;
-			auto rest = _BuffSize - size * sizeof Unit;
+			auto rest = _BuffSize % sizeof Unit;
 			if (rest)
 			{
 				char *cp = _pBuffer.get() + _BuffSize;
@@ -294,7 +301,7 @@ namespace lyf
 		void _flushToStream(std::ostream &out)
 		{
 			auto size = _BuffSize / sizeof Unit;
-			auto rest = _BuffSize - size * sizeof Unit;
+			auto rest = _BuffSize % sizeof Unit;
 			if (rest)
 			{
 				char *cp = _pBuffer.get() + _BuffSize;
@@ -316,11 +323,6 @@ namespace lyf
 						_c = 0;
 					}
 				}
-			}
-			if (rest && _pos)
-			{
-				_s.push_back(_c);
-				_nCodeFillBits = 8 - _pos;
 			}
 			out.write(_s.data(), _s.size());
 			_s.clear();
@@ -431,7 +433,7 @@ namespace lyf
 				_BuffSize = _MAX_BUFF_SIZE;
 				_flushToStream(out);
 			}
-			uint64_t restBits = nSrcBits - cnt * _MAX_BUFF_SIZE * 8;
+			uint64_t restBits = nSrcBits % (_MAX_BUFF_SIZE * 8);
 			if (restBits)
 			{
 				uint64_t restBytes = (restBits + 7) / 8;
@@ -539,7 +541,6 @@ namespace lyf
 				const string &header = _pEncoder->getHeader();
 				outf.write(reinterpret_cast<char*>(&lv), 1);
 				unsigned int hsize = header.size();
-				//cout << int(lv) << ":" << hsize << endl;
 				outf.write(reinterpret_cast<char*>(&hsize), 4);
 				outf.write(header.data(), header.size());
 				outf.write(outs.str().data(), outs.str().size());
@@ -570,7 +571,6 @@ namespace lyf
 			for (auto &f : toremove)
 				remove(f.c_str());
 			rename(outfilename.c_str(), dst.c_str());
-			//_pEncoder->showCodes();
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
@@ -592,7 +592,7 @@ namespace lyf
 		{
 		}
 
-		void decompress(const string &src)
+		void decompress(const string &src, const string &dst)
 		{
 			string infilename = src, outfilename = ".decode1.tmp";
 			std::ifstream in;
@@ -606,7 +606,6 @@ namespace lyf
 				outf.open(outfilename, std::ofstream::binary);
 				in.read(&lv, 1);
 				in.read(reinterpret_cast<char*>(&hsize), 4);
-				//cout << int(lv) << ":" << hsize << endl;
 				string header;
 				header.resize(hsize);
 				in.read(header.data(), hsize);
@@ -623,8 +622,10 @@ namespace lyf
 				infilename = outfilename;
 				outfilename.replace(7, 1, 1, ++i + 48);
 			}
+			toremove.push_back(dst);
 			for (auto &f : toremove)
 				remove(f.c_str());
+			rename(outfilename.c_str(), dst.c_str());
 		}
 
 	private:
