@@ -190,19 +190,19 @@ namespace lyf
 			_nCodeFillBits = 0;
 		}
 
-		void showCodes(size_t n = 0)
+		void showCodes(size_t n = 0, std::ostream &out = cout)
 		{
 			if (!n)
 				n = _pUnit2BitSet->size();
 			size_t k = 0;
 			for (auto it = _pUnit2BitSet->begin(); it != _pUnit2BitSet->end() && k != n; it++, k++)
 			{
-				cout << it->first << ": ";
+				out << it->first << ": ";
 				for (auto i = it->second->begin(), end = it->second->end(); i != end; i++)
 				{
-					cout << *i;
+					out << *i;
 				}
-				cout << endl;
+				out << endl;
 			}
 		}
 
@@ -439,7 +439,7 @@ namespace lyf
 			}
 		}
 
-		void showCode(size_t n = 0)
+		void showCodes(size_t n = 0, std::ostream &out = cout)
 		{
 			if (!n)
 				n = _pBitSet2Data->size();
@@ -448,9 +448,9 @@ namespace lyf
 			{
 				for (auto i = it->first.begin(), end = it->first.end(); i != end; i++)
 				{
-					cout << *i;
+					out << *i;
 				}
-				cout << ": ";
+				out << ": ";
 				uint64_t v = 0;
 				int j = 0;
 				for (unsigned char s : it->second)
@@ -458,7 +458,7 @@ namespace lyf
 					v += static_cast<uint64_t>(s) << (j * 8);
 					j++;
 				}
-				cout << v << endl;
+				out << v << endl;
 			}
 		}
 
@@ -568,7 +568,6 @@ namespace lyf
 			for (auto &f : toremove)
 				remove(f.c_str());
 			rename(outfilename.c_str(), dst.c_str());
-			
 		}
 
 		inline static const uint8_t MAX_COMPRESSION_LEVEL = 9;
