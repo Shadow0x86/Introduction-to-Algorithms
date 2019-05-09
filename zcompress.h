@@ -598,19 +598,31 @@ namespace lyf
 			std::ifstream in;
 			std::ofstream outf;
 			vector<string> toremove;
-			char lv, i = 1;
+			char lv = 0, i = 1;
 			unsigned int hsize;
+			bool error = false;
 			while (true)
 			{
 				in.open(infilename, std::ifstream::binary);
 				outf.open(outfilename, std::ofstream::binary);
-				in.read(&lv, 1);
-				in.read(reinterpret_cast<char*>(&hsize), 4);
-				string header;
-				header.resize(hsize);
-				in.read(header.data(), hsize);
-				_pDecoder->setHeader(header);
-				_pDecoder->decode(in, outf);
+				char newlv;
+				in.read(&newlv, 1);
+				if ((newlv < 1 || newlv > 9) || (lv > 0 && newlv != lv - 1))
+				{
+					error = true;
+					toremove.push_back(outfilename);
+					lv = 1;
+				}
+				if (!error)
+				{
+					lv = newlv;
+					in.read(reinterpret_cast<char*>(&hsize), 4);
+					string header;
+					header.resize(hsize);
+					in.read(header.data(), hsize);
+					_pDecoder->setHeader(header);
+					_pDecoder->decode(in, outf);
+				}
 				in.clear();
 				in.close();
 				outf.clear();
@@ -622,9 +634,12 @@ namespace lyf
 				infilename = outfilename;
 				outfilename.replace(7, 1, 1, ++i + 48);
 			}
-			toremove.push_back(dst);
+			if (!error)
+				toremove.push_back(dst);
 			for (auto &f : toremove)
 				remove(f.c_str());
+			if (error)
+				throw std::runtime_error("The compression file is corrupt");
 			rename(outfilename.c_str(), dst.c_str());
 		}
 
