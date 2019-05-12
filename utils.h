@@ -805,4 +805,38 @@ namespace lyf
 		return h(vp);
 	}
 	
+	template<typename _Func>
+	void _traversalTuple_Recursive(const std::tuple<> &tuple, _Func func)
+	{
+	}
+
+	template<typename _Func, typename _This, typename... _Rest>
+	void _traversalTuple_Recursive(const std::tuple<_This, _Rest...> &tuple, _Func func)
+	{
+		func(std::get<0>(tuple));
+		_traversalTuple_Recursive(reinterpret_cast<const std::tuple<_Rest...>&>(tuple), func);
+	}
+
+	template<typename _Func, typename... Types>
+	void traversalTuple(const std::tuple<Types...> &tuple, _Func func)
+	{
+		_traversalTuple_Recursive(tuple, func);
+	}
+
+}
+
+namespace std
+{
+	template<typename _This, typename... _Rest>
+	std::ostream &operator<<(std::ostream &out, const std::tuple<_This, _Rest...> &tuple)
+	{
+		out << "(" << std::get<0>(tuple);
+		auto f = [&](const auto &e)
+		{
+			out << ", " << e;
+		};
+		lyf::traversalTuple(reinterpret_cast<const std::tuple<_Rest...>&>(tuple), f);
+		out << ")";
+		return out;
+	}
 }
