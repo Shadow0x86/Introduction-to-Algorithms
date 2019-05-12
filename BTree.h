@@ -42,8 +42,10 @@ namespace lyf
 	public:
 		using key_type = std::tuple<std::remove_cv_t<std::remove_reference_t<Types>>...>;
 		using key_cont = std::vector<key_type>;
-		using child_type = size_t;
-		using child_cont = std::vector<child_type>;
+		using child_id_t = std::string;
+		//using id_cont = std::vector<child_id_t>;
+		using child_ptr_t = std::unique_ptr<BTreeNode>;
+		using child_cont = std::vector<child_ptr_t>;
 		constexpr size_t _TypeSize = std::tuple_size_v<key_type>;
 
 	public:
@@ -66,21 +68,19 @@ namespace lyf
 		}
 
 		BTreeNode(bool isleaf, const std::string &id, const std::string &dir)
-			: _pKeyCont(new key_cont()), _pChildCont(nullptr), _MyId(id)
+			: BTreeNode(isleaf, id)
 		{
-			if (isleaf)
-			{
-				_pChildCont.reset(new child_cont);
-			}
 			load(dir);
 		}
 
-		BTreeNode(const BTreeNode&) = delete;
-		BTreeNode& operator=(const BTreeNode&) = delete;
+		BTreeNode(const BTreeNode &) = delete;
+		BTreeNode& operator=(const BTreeNode &) = delete;
 
-		static std::unique_ptr<BTreeNode> getRoot(const std::string &dir);
+		static std::unique_ptr<BTreeNode> getRoot(const std::string &dir, const std::string &id);
 
-		size_t size() const
+		static std::unique_ptr<BTreeNode> load(const std::string &dir, const std::string &id);
+
+		size_t keySize() const
 		{
 			return _pKeyCont->size();
 		}
@@ -90,14 +90,24 @@ namespace lyf
 			return _pChildCont == nullptr;
 		}
 
+		const child_id_t &id() const
+		{
+			return _MyId;
+		}
+
 		void save(const std::string &dir) const;
 
 		void load(const std::string &dir);
 
-		void discard();
+		void discard()
+		{
+			_pKeyCont->clear();
+			if (_pChildCont)
+				_pChildCont->clear();
+		}
 
 	private:
-		const std::string _MyId;
+		const child_id_t _MyId;
 		std::unique_ptr<key_cont> _pKeyCont;
 		std::unique_ptr<child_cont> _pChildCont;
 	};
