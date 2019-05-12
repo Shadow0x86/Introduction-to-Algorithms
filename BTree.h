@@ -7,24 +7,20 @@
 #include <fstream>
 #include <sstream>
 #include <random>
+#include "utils.h"
 
 
 namespace lyf
 {
 
-	unsigned char random_char() {
-		std::random_device rd;
-		std::mt19937 gen(rd());
-		std::uniform_int_distribution<> dis(0, 255);
-		return static_cast<unsigned char>(dis(gen));
-	}
-
-	std::string generate_hex(const unsigned int len) {
+	std::string generate_hex(const unsigned int len)
+	{
 		std::stringstream ss;
-		for (auto i = 0; i < len; i++) {
-			auto rc = random_char();
+		for (auto i = 0; i < len; i++)
+		{
+			auto rc = randint(256);
 			std::stringstream hexstream;
-			hexstream << std::hex << int(rc);
+			hexstream << std::hex << rc;
 			auto hex = hexstream.str();
 			ss << (hex.length() < 2 ? '0' + hex : hex);
 		}
@@ -34,6 +30,30 @@ namespace lyf
 	inline std::string uuid()
 	{
 		return generate_hex(16);
+	}
+
+	template<typename _Valt>
+	inline void writeValueToFile(std::ofstream &outf, const _Valt &value)
+	{
+		outf.write(reinterpret_cast<const char*>(&value), sizeof(_Valt));
+	}
+
+	template<typename... Types>
+	inline void writeTupleToFile(std::ofstream &outf, const std::tuple<Types...> &tuple)
+	{
+		traversalTuple(tuple, [&](const auto &e) { writeValueToFile(outf, e); });
+	}
+
+	template<typename _Valt>
+	inline void readValueFromFile(std::ifstream &inf, _Valt &value)
+	{
+		inf.read(reinterpret_cast<char*>(&value), sizeof(_Valt));
+	}
+
+	template<typename... Types>
+	inline void readTupleFromFile(std::ifstream &inf, std::tuple<Types...> &tuple)
+	{
+		traversalTuple(tuple, [&](auto &e) { readValueFromFile(inf, e); });
 	}
 
 	template<typename... Types>
@@ -46,7 +66,7 @@ namespace lyf
 		//using id_cont = std::vector<child_id_t>;
 		using child_ptr_t = std::unique_ptr<BTreeNode>;
 		using child_cont = std::vector<child_ptr_t>;
-		constexpr size_t _TypeSize = std::tuple_size_v<key_type>;
+		const size_t _TypeSize = std::tuple_size_v<key_type>;
 
 	public:
 		BTreeNode(bool isleaf = false)
