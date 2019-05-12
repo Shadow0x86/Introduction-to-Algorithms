@@ -9,6 +9,8 @@
 
 namespace lyf
 {
+	using std::string;
+
 	template<typename... Types>
 	class BTreeNode
 	{
@@ -21,7 +23,7 @@ namespace lyf
 
 	public:
 		BTreeNode(bool isleaf)
-			: _pKeyCont(new key_cont()), _pChildCont(nullptr)
+			: _pKeyCont(new key_cont()), _pChildCont(nullptr), _MyId(_id++)
 		{
 			if (isleaf)
 			{
@@ -29,11 +31,13 @@ namespace lyf
 			}
 		}
 
-		BTreeNode(std::string filename, bool isleaf)
-			: BTreeNode(isleaf), _Filename(filename)
-		{
-			load();
-		}
+		BTreeNode(bool isleaf, size_t id);
+
+		BTreeNode(const BTreeNode&) = delete;
+		BTreeNode& operator=(const BTreeNode&) = delete;
+
+		static std::unique_ptr<BTreeNode> getRoot(const string &dir);
+		static std::unique_ptr<BTreeNode> newNode();
 
 		size_t size() const
 		{
@@ -45,19 +49,17 @@ namespace lyf
 			return _pChildCont == nullptr;
 		}
 
-		void setFilename(std::string filename)
-		{
-			_Filename = filename;
-		}
+		void save(const string &dir) const;
 
-		void save() const;
+		void load(const string &dir);
 
-		void load() const;
+		void discard();
 
 	private:
+		static size_t _id;
+		const size_t _MyId;
 		std::unique_ptr<key_cont> _pKeyCont;
 		std::unique_ptr<child_cont> _pChildCont;
-		std::string _Filename;
 	};
 
 
