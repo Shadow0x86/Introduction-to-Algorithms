@@ -13,25 +13,6 @@
 namespace lyf
 {
 
-	std::string generate_hex(const unsigned int len)
-	{
-		std::stringstream ss;
-		for (auto i = 0; i < len; i++)
-		{
-			auto rc = randint(256);
-			std::stringstream hexstream;
-			hexstream << std::hex << rc;
-			auto hex = hexstream.str();
-			ss << (hex.length() < 2 ? '0' + hex : hex);
-		}
-		return ss.str();
-	}
-
-	inline std::string uuid()
-	{
-		return generate_hex(16);
-	}
-
 	template<typename _Valt>
 	inline void writeValueToFile(std::ofstream &outf, const _Valt &value)
 	{

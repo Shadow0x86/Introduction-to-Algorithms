@@ -1,6 +1,9 @@
 #pragma once
 #include <cassert>
 #include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <fstream>
 #include <string>
 #include <chrono>
 #include <utility>
@@ -839,6 +842,93 @@ namespace lyf
 	void traversalTuple(std::tuple<Types...> &tuple, _Func func)
 	{
 		_traversalTuple_Recursive(tuple, func);
+	}
+
+	class uuid
+	{
+	public:
+		uuid()
+			: _pData(new char[_N]), _pHex(nullptr)
+		{
+			for (size_t i = 0; i != _N; i++)
+			{
+				_pData[i] = static_cast<char>(randint(256));
+			}
+		}
+
+		//uuid(string _hex)
+		//	: _pData(new char[_N]), _pHex(nullptr)
+		//{
+		//	if (_hex.size() != _N * 2)
+		//		throw std::invalid_argument("_hex");
+		//	for (char c : _hex)
+		//	{
+		//		if (!(48 <= c && c <= 57 || 97 <= c && c <= 102 || 65 <= c && c <= 70))
+		//			throw std::invalid_argument("_hex");
+		//	}
+		//}
+
+		uuid(std::ifstream &inf)
+			: _pData(new char[_N]), _pHex(nullptr)
+		{
+			inf.read(_pData.get(), _N);
+		}
+
+		uuid(const uuid &) = delete;
+		uuid &operator=(const uuid &) = delete;
+
+		inline string toString() const
+		{
+			return hex();
+		}
+
+		inline string hex() const
+		{
+			return const_cast<uuid*>(this)->hex();
+		}
+
+		string hex()
+		{
+			if (!_pHex)
+			{
+				std::stringstream ss;
+				for (size_t i = 0; i != _N; i++)
+				{
+					ss << std::hex << std::setw(2) << std::setfill('0')
+						<< static_cast<int>(static_cast<unsigned char>(_pData[i]));
+				}
+				_pHex.reset(new string(ss.str()));
+			}
+			return (*_pHex);
+		}
+
+		inline static string new_hex()
+		{
+			return uuid().hex();
+		}
+
+		inline static uuid fromFile(std::ifstream &inf)
+		{
+			return uuid(inf);
+		}
+
+		inline void toFile(std::ofstream &outf, bool flush = false) const
+		{
+			outf.write(_pData.get(), _N);
+			if (flush)
+				outf.flush();
+		}
+
+	private:
+		inline static size_t const _N = 16;
+		std::unique_ptr<char[]> const _pData;
+		std::unique_ptr<string> _pHex;
+	};
+
+	std::ostream &operator<<(std::ostream &out, const uuid &value)
+	{
+		out << value.toString();
+		return out;
 	}
 
 }
