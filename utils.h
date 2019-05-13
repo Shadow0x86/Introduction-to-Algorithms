@@ -848,16 +848,14 @@ namespace lyf
 	{
 	public:
 		uuid()
-			: _pData(new char[_N])
 		{
 			for (size_t i = 0; i != _N; i++)
 			{
-				_pData[i] = static_cast<char>(randint(256));
+				_Data[i] = static_cast<char>(randint(256));
 			}
 		}
 
 		//uuid(string _hex)
-		//	: _pData(new char[_N])
 		//{
 		//	if (_hex.size() != _N * 2)
 		//		throw std::invalid_argument("_hex");
@@ -869,9 +867,8 @@ namespace lyf
 		//}
 
 		uuid(std::ifstream &inf)
-			: _pData(new char[_N])
 		{
-			inf.read(_pData.get(), _N);
+			inf.read(_Data, _N);
 		}
 
 		uuid(const uuid &) = delete;
@@ -888,7 +885,7 @@ namespace lyf
 			for (size_t i = 0; i != _N; i++)
 			{
 				ss << std::hex << std::setw(2) << std::setfill('0')
-					<< static_cast<int>(static_cast<unsigned char>(_pData[i]));
+					<< static_cast<int>(static_cast<unsigned char>(_Data[i]));
 			}
 			return ss.str();
 		}
@@ -905,14 +902,14 @@ namespace lyf
 
 		inline void toFile(std::ofstream &outf, bool flush = false) const
 		{
-			outf.write(_pData.get(), _N);
+			outf.write(_Data, _N);
 			if (flush)
 				outf.flush();
 		}
 
 	private:
 		inline static size_t const _N = 16;
-		std::unique_ptr<char[]> const _pData;
+		char _Data[_N];
 	};
 
 	std::ostream &operator<<(std::ostream &out, const uuid &value)
