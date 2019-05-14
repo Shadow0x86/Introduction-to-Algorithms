@@ -48,55 +48,43 @@ namespace lyf
 		const size_t _TypeSize = std::tuple_size_v<key_type>;
 
 	public:
-		BTreeNode(bool isleaf = false)
-			: _pKeyCont(new key_cont()), _pChildCont(nullptr), _pID(new id_type)
+		BTreeNode()
+			: _pID(new id_type), _KeyCont()
 		{
-			if (isleaf)
-			{
-				_pChildCont.reset(new child_cont);
-			}
 		}
-
-		//BTreeNode(bool isleaf, const std::string &id, const std::string &dir)
-		//	: BTreeNode(isleaf, id)
-		//{
-		//	load(dir);
-		//}
 
 		BTreeNode(const BTreeNode &) = delete;
 		BTreeNode& operator=(const BTreeNode &) = delete;
 
-		static std::unique_ptr<BTreeNode> getRoot(const std::string &dir, const std::string &id);
-
-		static std::unique_ptr<BTreeNode> load(const std::string &dir, const std::string &id);
-
 		size_t keySize() const
 		{
-			return _pKeyCont->size();
+			return _KeyCont.size();
+		}
+
+		string id() const
+		{
+			return _pID->hex();
 		}
 
 		virtual bool isLeaf() const = 0;
 
-		void save(const string &dir) const;
+		virtual void save(const string &dir) const = 0;
 
-		void load(const string &dir);
+		virtual void load(const string &dir) = 0;
 
-		void load(const string &dir, size_t i);
-
-		void discard()
+		virtual void discard()
 		{
 			_KeyCont.clear();
 		}
 
 	protected:
 
-		BTreeNode(id_type *id, const string &dir)
-			: _pID(id)
+		BTreeNode(const id_type *id)
+			: _pID(id), _KeyCont()
 		{
-			load(dir);
 		}
 
-		id_ptr_type _pID;
+		id_ptr_type const _pID;
 		key_cont _KeyCont;
 	};
 
@@ -105,18 +93,82 @@ namespace lyf
 	class BTreeInternalNode : public BTreeNode<Types...>
 	{
 	public:
+		using _MyBase = BTreeNode<Types...>;
+		using key_type = typename _MyBase::key_type;
+		using key_cont = typename _MyBase::key_cont;
+		using id_type = typename _MyBase::id_type;
+		using id_ptr_type = typename _MyBase::id_ptr_type;
 		using child_id_cont = std::vector<id_ptr_type>;
 		using child_ptr_t = std::unique_ptr<BTreeNode>;
 		using child_ptr_cont = std::vector<child_ptr_t>;
 
-		constexpr bool isLeaf() const override
+		BTreeInternalNode()
+			: _MyBase(), _ChildIdCont(), _ChildPtrCont()
+		{
+		}
+
+		BTreeInternalNode(const id_type *id)
+			: _MyBase(id), _ChildIdCont(), _ChildPtrCont()
+		{
+		}
+
+		bool isLeaf() const override
 		{
 			return false;
 		}
 
+		void save(const string &dir) const override
+		{
+			size_t n = this->_KeyCont.size();
+			string path = dir + this->_pID->hex();
+			std::ofstream outf(path, std::ofstream::binary);
+			outf.write(reinterpret_cast<char*>(&n), sizeof(n));
+			for (const auto &t : this->_KeyCont)
+			{
+				writeTupleToFile(outf, t);
+			}
+			for (const auto &idp : this->_ChildIdCont)
+			{
+				idp->toFile(outf);
+			}
+			outf.close();
+		}
+
+		void load(const string &dir) override
+		{
+			string path = dir + this->_pID->hex();
+			std::ifstream inf(path, std::ifstream::binary);
+			size_t n;
+			inf.read(reinterpret_cast<char*>(&n), sizeof(n));
+			this->_KeyCont.resize(n);
+			for (auto &t : this->_KeyCont)
+			{
+				readTupleFromFile(inf, t);
+			}
+			this->_ChildIdCont.resize(n + 1);
+			this->_ChildPtrCont.resize(n + 1);
+			for (auto &idp : this->_ChildIdCont)
+			{
+				idp.reset(new id_type(inf));
+			}
+			inf.close();
+		}
+
+		void loadChild(const string &dir, size_t i)
+		{
+			// TODO
+		}
+
+		void discard() override
+		{
+			_MyBase::discard();
+			_ChildIdCont.clear();
+			_ChildPtrCont.clear();
+		}
+
 	private:
 		child_id_cont _ChildIdCont;
-		child_ptr_cont _ChildNodeCont;
+		child_ptr_cont _ChildPtrCont;
 	};
 
 
@@ -125,7 +177,7 @@ namespace lyf
 	{
 	public:
 
-		constexpr bool isLeaf() const override
+		bool isLeaf() const override
 		{
 			return true;
 		}
