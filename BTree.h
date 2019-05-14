@@ -43,15 +43,13 @@ namespace lyf
 	public:
 		using key_type = std::tuple<std::remove_cv_t<std::remove_reference_t<Types>>...>;
 		using key_cont = std::vector<key_type>;
-		using child_id_t = std::string;
-		//using id_cont = std::vector<child_id_t>;
-		using child_ptr_t = std::unique_ptr<BTreeNode>;
-		using child_cont = std::vector<child_ptr_t>;
+		using id_type = lyf::uuid;
+		using id_ptr_type = std::unique_ptr<const id_type>;
 		const size_t _TypeSize = std::tuple_size_v<key_type>;
 
 	public:
 		BTreeNode(bool isleaf = false)
-			: _pKeyCont(new key_cont()), _pChildCont(nullptr), _MyId(uuid())
+			: _pKeyCont(new key_cont()), _pChildCont(nullptr), _pID(new id_type)
 		{
 			if (isleaf)
 			{
@@ -59,20 +57,11 @@ namespace lyf
 			}
 		}
 
-		BTreeNode(bool isleaf, const std::string &id)
-			: _pKeyCont(new key_cont()), _pChildCont(nullptr), _MyId(id)
-		{
-			if (isleaf)
-			{
-				_pChildCont.reset(new child_cont);
-			}
-		}
-
-		BTreeNode(bool isleaf, const std::string &id, const std::string &dir)
-			: BTreeNode(isleaf, id)
-		{
-			load(dir);
-		}
+		//BTreeNode(bool isleaf, const std::string &id, const std::string &dir)
+		//	: BTreeNode(isleaf, id)
+		//{
+		//	load(dir);
+		//}
 
 		BTreeNode(const BTreeNode &) = delete;
 		BTreeNode& operator=(const BTreeNode &) = delete;
@@ -86,31 +75,59 @@ namespace lyf
 			return _pKeyCont->size();
 		}
 
-		bool isLeaf() const
-		{
-			return _pChildCont == nullptr;
-		}
+		virtual bool isLeaf() const = 0;
 
-		const child_id_t &id() const
-		{
-			return _MyId;
-		}
+		void save(const string &dir) const;
 
-		void save(const std::string &dir) const;
+		void load(const string &dir);
 
-		void load(const std::string &dir);
+		void load(const string &dir, size_t i);
 
 		void discard()
 		{
-			_pKeyCont->clear();
-			if (_pChildCont)
-				_pChildCont->clear();
+			_KeyCont.clear();
+		}
+
+	protected:
+
+		BTreeNode(id_type *id, const string &dir)
+			: _pID(id)
+		{
+			load(dir);
+		}
+
+		id_ptr_type _pID;
+		key_cont _KeyCont;
+	};
+
+
+	template<typename... Types>
+	class BTreeInternalNode : public BTreeNode<Types...>
+	{
+	public:
+		using child_id_cont = std::vector<id_ptr_type>;
+		using child_ptr_t = std::unique_ptr<BTreeNode>;
+		using child_ptr_cont = std::vector<child_ptr_t>;
+
+		constexpr bool isLeaf() const override
+		{
+			return false;
 		}
 
 	private:
-		const child_id_t _MyId;
-		std::unique_ptr<key_cont> _pKeyCont;
-		std::unique_ptr<child_cont> _pChildCont;
+		std::unique_ptr<child_ptr_cont> _pChildCont;
+	};
+
+
+	template<typename... Types>
+	class BTreeLeafNode : public BTreeNode<Types...>
+	{
+	public:
+
+		constexpr bool isLeaf() const override
+		{
+			return true;
+		}
 	};
 
 
