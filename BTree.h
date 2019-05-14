@@ -115,7 +115,8 @@ namespace lyf
 		}
 
 	private:
-		std::unique_ptr<child_ptr_cont> _pChildCont;
+		child_id_cont _ChildIdCont;
+		child_ptr_cont _ChildNodeCont;
 	};
 
 
