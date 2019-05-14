@@ -918,6 +918,82 @@ namespace lyf
 		return out;
 	}
 
+	template<typename _Valt>
+	inline void writeValueToFile(std::ofstream &outf, const _Valt &value)
+	{
+		outf.write(reinterpret_cast<const char*>(&value), sizeof(_Valt));
+	}
+
+	template<typename... Types>
+	inline void writeTupleToFile(std::ofstream &outf, const std::tuple<Types...> &tuple)
+	{
+		traversalTuple(tuple, [&](const auto &e) { writeValueToFile(outf, e); });
+	}
+
+	template<typename _Valt>
+	inline void readValueFromFile(std::ifstream &inf, _Valt &value)
+	{
+		inf.read(reinterpret_cast<char*>(&value), sizeof(_Valt));
+	}
+
+	template<typename... Types>
+	inline void readTupleFromFile(std::ifstream &inf, std::tuple<Types...> &tuple)
+	{
+		traversalTuple(tuple, [&](auto &e) { readValueFromFile(inf, e); });
+	}
+
+	template<typename _Valt>
+	struct Serializer
+	{
+		using Valt = _Valt;
+
+		inline static void serialize(std::ofstream &outf, const Valt &value)
+		{
+			outf.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
+		}
+
+		inline static Valt unserialize(std::ifstream &inf)
+		{
+			Valt ret;
+			inf.read(reinterpret_cast<char*>(&ret), sizeof(Valt));
+			return ret;
+		}
+	};
+
+	template<typename... Types>
+	struct Serializer<std::tuple<Types...>>
+	{
+		using Valt = std::tuple<Types...>;
+
+		inline static void serialize(std::ofstream &outf, const Valt &value)
+		{
+			writeTupleToFile(outf, value);
+		}
+
+		inline static Valt unserialize(std::ifstream &inf)
+		{
+			Valt ret;
+			readTupleFromFile(inf, ret);
+			return ret;
+		}
+	};
+
+	template<>
+	struct Serializer<uuid>
+	{
+		using Valt = uuid;
+
+		inline static void serialize(std::ofstream &outf, const Valt &value)
+		{
+			outf.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
+		}
+
+		inline static Valt unserialize(std::ifstream &inf)
+		{
+			return Valt(inf);
+		}
+	};
+
 }
 
 namespace std
