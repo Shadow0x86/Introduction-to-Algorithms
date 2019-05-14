@@ -13,43 +13,18 @@
 namespace lyf
 {
 
-	template<typename _Valt>
-	inline void writeValueToFile(std::ofstream &outf, const _Valt &value)
-	{
-		outf.write(reinterpret_cast<const char*>(&value), sizeof(_Valt));
-	}
-
-	template<typename... Types>
-	inline void writeTupleToFile(std::ofstream &outf, const std::tuple<Types...> &tuple)
-	{
-		traversalTuple(tuple, [&](const auto &e) { writeValueToFile(outf, e); });
-	}
-
-	template<typename _Valt>
-	inline void readValueFromFile(std::ifstream &inf, _Valt &value)
-	{
-		inf.read(reinterpret_cast<char*>(&value), sizeof(_Valt));
-	}
-
-	template<typename... Types>
-	inline void readTupleFromFile(std::ifstream &inf, std::tuple<Types...> &tuple)
-	{
-		traversalTuple(tuple, [&](auto &e) { readValueFromFile(inf, e); });
-	}
-
-	template<typename... Types>
+	template<typename _KeyType>
 	class BTreeNode
 	{
 	public:
-		using key_type = std::tuple<std::remove_cv_t<std::remove_reference_t<Types>>...>;
+		using key_type = _KeyType;
 		using key_cont = std::vector<key_type>;
 		using id_type = lyf::uuid;
 		using id_ptr_type = std::unique_ptr<const id_type>;
-		const size_t _TypeSize = std::tuple_size_v<key_type>;
 
 	public:
 		BTreeNode()
-			: _pID(new id_type), _KeyCont()
+			: _pID(new id_type), _KeyCont(), _Loaded(false)
 		{
 		}
 
@@ -80,20 +55,21 @@ namespace lyf
 	protected:
 
 		BTreeNode(const id_type *id)
-			: _pID(id), _KeyCont()
+			: _pID(id), _KeyCont(), _Loaded(false)
 		{
 		}
 
 		id_ptr_type const _pID;
 		key_cont _KeyCont;
+		bool _Loaded;
 	};
 
 
-	template<typename... Types>
-	class BTreeInternalNode : public BTreeNode<Types...>
+	template<typename _KeyType>
+	class BTreeInternalNode : public BTreeNode<_KeyType>
 	{
 	public:
-		using _MyBase = BTreeNode<Types...>;
+		using _MyBase = BTreeNode<_KeyType>;
 		using key_type = typename _MyBase::key_type;
 		using key_cont = typename _MyBase::key_cont;
 		using id_type = typename _MyBase::id_type;
@@ -104,11 +80,6 @@ namespace lyf
 
 		BTreeInternalNode()
 			: _MyBase(), _ChildIdCont(), _ChildPtrCont()
-		{
-		}
-
-		BTreeInternalNode(const id_type *id)
-			: _MyBase(id), _ChildIdCont(), _ChildPtrCont()
 		{
 		}
 
@@ -125,17 +96,19 @@ namespace lyf
 			outf.write(reinterpret_cast<char*>(&n), sizeof(n));
 			for (const auto &t : this->_KeyCont)
 			{
-				writeTupleToFile(outf, t);
+				Serializer<key_type>::serialize(outf, t);
 			}
 			for (const auto &idp : this->_ChildIdCont)
 			{
-				idp->toFile(outf);
+				Serializer<id_type>::serialize(outf, *idp);
 			}
 			outf.close();
 		}
 
 		void load(const string &dir) override
 		{
+			if (this->_Loaded)
+				return;
 			string path = dir + this->_pID->hex();
 			std::ifstream inf(path, std::ifstream::binary);
 			size_t n;
@@ -143,20 +116,21 @@ namespace lyf
 			this->_KeyCont.resize(n);
 			for (auto &t : this->_KeyCont)
 			{
-				readTupleFromFile(inf, t);
+				Serializer<key_type>::unserialize(inf, t);
 			}
 			this->_ChildIdCont.resize(n + 1);
 			this->_ChildPtrCont.resize(n + 1);
 			for (auto &idp : this->_ChildIdCont)
 			{
-				idp.reset(new id_type(inf));
+				idp = Serializer<id_type>::unserialize(inf);
 			}
 			inf.close();
+			this->_Loaded = true;
 		}
 
 		void loadChild(const string &dir, size_t i)
 		{
-			// TODO
+			this->_ChildPtrCont[i]->load(dir);
 		}
 
 		void discard() override
@@ -164,16 +138,22 @@ namespace lyf
 			_MyBase::discard();
 			_ChildIdCont.clear();
 			_ChildPtrCont.clear();
+			this->_Loaded = false;
 		}
 
 	private:
+		BTreeInternalNode(const id_type *id)
+			: _MyBase(id), _ChildIdCont(), _ChildPtrCont()
+		{
+		}
+
 		child_id_cont _ChildIdCont;
 		child_ptr_cont _ChildPtrCont;
 	};
 
 
-	template<typename... Types>
-	class BTreeLeafNode : public BTreeNode<Types...>
+	template<typename _KeyType>
+	class BTreeLeafNode : public BTreeNode<_KeyType>
 	{
 	public:
 

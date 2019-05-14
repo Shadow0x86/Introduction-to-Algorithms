@@ -952,10 +952,15 @@ namespace lyf
 			outf.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
 		}
 
-		inline static Valt unserialize(std::ifstream &inf)
+		inline static void unserialize(std::ifstream &inf, Valt &value)
 		{
-			Valt ret;
-			inf.read(reinterpret_cast<char*>(&ret), sizeof(Valt));
+			inf.read(reinterpret_cast<char*>(&value), sizeof(Valt));
+		}
+
+		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
+		{
+			std::unique_ptr<Valt> ret(new Valt);
+			inf.read(reinterpret_cast<char*>(ret.get()), sizeof(Valt));
 			return ret;
 		}
 	};
@@ -970,10 +975,15 @@ namespace lyf
 			writeTupleToFile(outf, value);
 		}
 
-		inline static Valt unserialize(std::ifstream &inf)
+		inline static void unserialize(std::ifstream &inf, Valt &value)
 		{
-			Valt ret;
-			readTupleFromFile(inf, ret);
+			readTupleFromFile(inf, value);
+		}
+
+		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
+		{
+			std::unique_ptr<Valt> ret(new Valt);
+			readTupleFromFile(inf, *ret);
 			return ret;
 		}
 	};
@@ -985,12 +995,16 @@ namespace lyf
 
 		inline static void serialize(std::ofstream &outf, const Valt &value)
 		{
-			outf.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
+			value.toFile(outf);
 		}
 
-		inline static Valt unserialize(std::ifstream &inf)
+		inline static void unserialize(std::ifstream &inf, Valt &value)
 		{
-			return Valt(inf);
+		}
+
+		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
+		{
+			return std::make_unique<Valt>(inf);
 		}
 	};
 
