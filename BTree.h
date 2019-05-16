@@ -18,6 +18,8 @@ namespace lyf
 	template<typename _KeyType>
 	class BTreeNode
 	{
+		friend class BTree<_KeyType>;
+
 	public:
 		using key_type = _KeyType;
 		using key_cont = std::vector<key_type>;
@@ -243,15 +245,19 @@ namespace lyf
 		BTree(const string &dir)
 			: _Dir(dir), _Root()
 		{
-			std::ifstream inf(dir + "root", std::ifstream::binary);
+			string rootpath = dir + "root";
+			std::ifstream inf(rootpath, std::ifstream::binary);
 			if (inf)
 			{
 				auto idp = Serializer<id_type>::unserialize(inf);
-				_Root.reset(new BTreeLeafNode(idp.release()));
+				_Root.reset(new BTreeLeafNode<key_type>(idp.release()));
 			}
 			else
 			{
-				_Root.reset(new BTreeLeafNode);
+				_Root.reset(new BTreeLeafNode<key_type>);
+				std::ofstream outf(rootpath, std::ofstream::binary);
+				Serializer<id_type>::serialize(outf, *(_Root->_pID));
+				outf.close();
 			}
 			_Root->load(dir);
 		}
@@ -277,8 +283,9 @@ namespace lyf
 				return { nullptr,0 };
 			else
 			{
-				dynamic_cast<BTreeInternalNode*>(np.get())->loacChild(this->_Dir, i);
-				return _searchRecursive(key, np->_ChildPtrCont[i]);
+				auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
+				p->loadChild(this->_Dir, i);
+				return _searchRecursive(key, p->_ChildPtrCont[i]);
 			}
 		}
 		void _splitChild(NodePtr np, size_t i);
