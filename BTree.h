@@ -12,6 +12,8 @@
 
 namespace lyf
 {
+	template<typename _KeyType>
+	class BTree;
 
 	template<typename _KeyType>
 	class BTreeNode
@@ -54,7 +56,6 @@ namespace lyf
 		}
 
 	protected:
-
 		BTreeNode(const id_type *id)
 			: _pID(id), _KeyCont(), _Loaded(false)
 		{
@@ -69,6 +70,8 @@ namespace lyf
 	template<typename _KeyType>
 	class BTreeInternalNode : public BTreeNode<_KeyType>
 	{
+		friend class BTree<_KeyType>;
+
 	public:
 		using _MyBase = BTreeNode<_KeyType>;
 		using key_type = typename _MyBase::key_type;
@@ -112,18 +115,21 @@ namespace lyf
 				return;
 			string path = dir + this->_pID->hex();
 			std::ifstream inf(path, std::ifstream::binary);
-			size_t n;
-			Serializer<size_t>::unserialize(inf, n);
-			this->_KeyCont.resize(n);
-			for (auto &t : this->_KeyCont)
+			if (inf)
 			{
-				Serializer<key_type>::unserialize(inf, t);
-			}
-			this->_ChildIdCont.resize(n + 1);
-			this->_ChildPtrCont.resize(n + 1);
-			for (auto &idp : this->_ChildIdCont)
-			{
-				idp = Serializer<id_type>::unserialize(inf);
+				size_t n;
+				Serializer<size_t>::unserialize(inf, n);
+				this->_KeyCont.resize(n);
+				for (auto &t : this->_KeyCont)
+				{
+					Serializer<key_type>::unserialize(inf, t);
+				}
+				this->_ChildIdCont.resize(n + 1);
+				this->_ChildPtrCont.resize(n + 1);
+				for (auto &idp : this->_ChildIdCont)
+				{
+					idp = Serializer<id_type>::unserialize(inf);
+				}
 			}
 			inf.close();
 			this->_Loaded = true;
@@ -155,11 +161,62 @@ namespace lyf
 	template<typename _KeyType>
 	class BTreeLeafNode : public BTreeNode<_KeyType>
 	{
+		friend class BTree<_KeyType>;
+
 	public:
+		using _MyBase = BTreeNode<_KeyType>;
+		using key_type = typename _MyBase::key_type;
+		using key_cont = typename _MyBase::key_cont;
+		using id_type = typename _MyBase::id_type;
+		using id_ptr_type = typename _MyBase::id_ptr_type;
+		
+		BTreeLeafNode()
+			: _MyBase()
+		{
+		}
 
 		bool isLeaf() const override
 		{
 			return true;
+		}
+
+		void save(const string &dir) const override
+		{
+			size_t n = this->_KeyCont.size();
+			string path = dir + this->_pID->hex();
+			std::ofstream outf(path, std::ofstream::binary);
+			Serializer<size_t>::serialize(outf, n);
+			for (const auto &t : this->_KeyCont)
+			{
+				Serializer<key_type>::serialize(outf, t);
+			}
+			outf.close();
+		}
+
+		void load(const string &dir) override
+		{
+			if (this->_Loaded)
+				return;
+			string path = dir + this->_pID->hex();
+			std::ifstream inf(path, std::ifstream::binary);
+			if (inf)
+			{
+				size_t n;
+				Serializer<size_t>::unserialize(inf, n);
+				this->_KeyCont.resize(n);
+				for (auto &t : this->_KeyCont)
+				{
+					Serializer<key_type>::unserialize(inf, t);
+				}
+			}
+			inf.close();
+			this->_Loaded = true;
+		}
+
+	private:
+		BTreeLeafNode(const id_type *id)
+			: _MyBase(id)
+		{
 		}
 	};
 
@@ -173,10 +230,26 @@ namespace lyf
 		using key_type = typename Node::key_type;
 
 	public:
-		BTree(const string &dir);
+		BTree(const string &dir)
+			: _Dir(dir), _Root()
+		{
+			std::ifstream inf(dir + "root", std::ifstream::binary);
+			if (inf)
+			{
+				auto idp = Serializer<uuid>::unserialize(inf);
+				_Root.reset(new BTreeLeafNode(idp.release()));
+			}
+			else
+			{
+				_Root.reset(new BTreeLeafNode);
+			}
+			_Root->load(dir);
+		}
 
+		std::pair<NodePtr, size_t> search(const key_type &key, NodePtr root = nullptr);
 
 	private:
+		string const _Dir;
 		NodePtr _Root;
 	};
 }
