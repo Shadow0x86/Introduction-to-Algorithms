@@ -50,6 +50,7 @@ namespace lyf
 		virtual void discard()
 		{
 			_KeyCont.clear();
+			this->_Loaded = false;
 		}
 
 	protected:
@@ -93,7 +94,7 @@ namespace lyf
 			size_t n = this->_KeyCont.size();
 			string path = dir + this->_pID->hex();
 			std::ofstream outf(path, std::ofstream::binary);
-			outf.write(reinterpret_cast<char*>(&n), sizeof(n));
+			Serializer<size_t>::serialize(outf, n);
 			for (const auto &t : this->_KeyCont)
 			{
 				Serializer<key_type>::serialize(outf, t);
@@ -112,7 +113,7 @@ namespace lyf
 			string path = dir + this->_pID->hex();
 			std::ifstream inf(path, std::ifstream::binary);
 			size_t n;
-			inf.read(reinterpret_cast<char*>(&n), sizeof(n));
+			Serializer<size_t>::unserialize(inf, n);
 			this->_KeyCont.resize(n);
 			for (auto &t : this->_KeyCont)
 			{
@@ -138,7 +139,6 @@ namespace lyf
 			_MyBase::discard();
 			_ChildIdCont.clear();
 			_ChildPtrCont.clear();
-			this->_Loaded = false;
 		}
 
 	private:
@@ -164,16 +164,16 @@ namespace lyf
 	};
 
 
-	template<typename... Types>
+	template<typename _KeyType>
 	class BTree
 	{
 	public:
-		using Node = BTreeNode<Types...>;
+		using Node = BTreeNode<_KeyType>;
 		using NodePtr = std::shared_ptr<Node>;
 		using key_type = typename Node::key_type;
 
 	public:
-		BTree();
+		BTree(const string &dir);
 
 
 	private:
