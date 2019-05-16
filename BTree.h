@@ -38,6 +38,11 @@ namespace lyf
 			return _KeyCont.size();
 		}
 
+		const key_type &keyValue(size_t i) const
+		{
+			return this->_KeyCont[i];
+		}
+
 		string id() const
 		{
 			return _pID->hex();
@@ -79,7 +84,7 @@ namespace lyf
 		using id_type = typename _MyBase::id_type;
 		using id_ptr_type = typename _MyBase::id_ptr_type;
 		using child_id_cont = std::vector<id_ptr_type>;
-		using child_ptr_t = std::unique_ptr<BTreeNode>;
+		using child_ptr_t = std::shared_ptr<BTreeNode>;
 		using child_ptr_cont = std::vector<child_ptr_t>;
 
 		BTreeInternalNode()
@@ -137,6 +142,10 @@ namespace lyf
 
 		void loadChild(const string &dir, size_t i)
 		{
+			if (!this->_ChildPtrCont[i])
+			{
+				this->_ChildPtrCont[i].reset(new BTreeInternalNode(_ChildIdCont[i].release()));
+			}
 			this->_ChildPtrCont[i]->load(dir);
 		}
 
@@ -228,6 +237,7 @@ namespace lyf
 		using Node = BTreeNode<_KeyType>;
 		using NodePtr = std::shared_ptr<Node>;
 		using key_type = typename Node::key_type;
+		using id_type = typename Node::id_type;
 
 	public:
 		BTree(const string &dir)
@@ -236,7 +246,7 @@ namespace lyf
 			std::ifstream inf(dir + "root", std::ifstream::binary);
 			if (inf)
 			{
-				auto idp = Serializer<uuid>::unserialize(inf);
+				auto idp = Serializer<id_type>::unserialize(inf);
 				_Root.reset(new BTreeLeafNode(idp.release()));
 			}
 			else
@@ -246,9 +256,34 @@ namespace lyf
 			_Root->load(dir);
 		}
 
-		std::pair<NodePtr, size_t> search(const key_type &key, NodePtr root = nullptr);
+		std::pair<NodePtr, size_t> search(const key_type &key) const
+		{
+			return _searchRecursive(key, _Root);
+		}
+
+		void insert(const key_type &key);
+		void remove(const key_type &key);
+		void discard();
 
 	private:
+		std::pair<NodePtr, size_t> _searchRecursive(const key_type &key, NodePtr np) const
+		{
+			size_t i = 0;
+			while (i != np->keySize() && key > np->keyValue(i))
+				i++;
+			if (i != np->keySize() && key == np->keyValue(i))
+				return { np,i };
+			else if (np->isLeaf())
+				return { nullptr,0 };
+			else
+			{
+				dynamic_cast<BTreeInternalNode*>(np.get())->loacChild(this->_Dir, i);
+				return _searchRecursive(key, np->_ChildPtrCont[i]);
+			}
+		}
+		void _splitChild(NodePtr np, size_t i);
+		void _insertNonFull(NodePtr np, const key_type &key);
+
 		string const _Dir;
 		NodePtr _Root;
 	};
