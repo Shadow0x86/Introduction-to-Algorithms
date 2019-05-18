@@ -844,31 +844,37 @@ namespace lyf
 		_traversalTuple_Recursive(tuple, func);
 	}
 
+
+	template<typename _This = void, typename... _Rest>
+	struct SerialSize
+	{
+		static const size_t value = sizeof(_This) + SerialSize<_Rest...>::value;
+	};
+
+	template<>
+	struct SerialSize<void>
+	{
+		static const size_t value = 0;
+	};
+	
+
+	template<typename... Types>
+	const size_t SerialSize_v = SerialSize<Types...>::value;
+
 	class uuid
 	{
 	public:
 		uuid()
 		{
-			for (size_t i = 0; i != _N; i++)
+			for (size_t i = 0; i != SIZE; i++)
 			{
 				_Data[i] = static_cast<char>(randint(256));
 			}
 		}
 
-		//uuid(string _hex)
-		//{
-		//	if (_hex.size() != _N * 2)
-		//		throw std::invalid_argument("_hex");
-		//	for (char c : _hex)
-		//	{
-		//		if (!(48 <= c && c <= 57 || 97 <= c && c <= 102 || 65 <= c && c <= 70))
-		//			throw std::invalid_argument("_hex");
-		//	}
-		//}
-
 		uuid(std::ifstream &inf)
 		{
-			inf.read(_Data, _N);
+			inf.read(_Data, SIZE);
 		}
 
 		uuid(const uuid &) = delete;
@@ -882,7 +888,7 @@ namespace lyf
 		string hex() const
 		{
 			std::stringstream ss;
-			for (size_t i = 0; i != _N; i++)
+			for (size_t i = 0; i != SIZE; i++)
 			{
 				ss << std::hex << std::setw(2) << std::setfill('0')
 					<< static_cast<int>(static_cast<unsigned char>(_Data[i]));
@@ -902,14 +908,15 @@ namespace lyf
 
 		inline void toFile(std::ofstream &outf, bool flush = false) const
 		{
-			outf.write(_Data, _N);
+			outf.write(_Data, SIZE);
 			if (flush)
 				outf.flush();
 		}
 
+		inline static size_t const SIZE = 16;
+
 	private:
-		inline static size_t const _N = 16;
-		char _Data[_N];
+		char _Data[SIZE];
 	};
 
 	std::ostream &operator<<(std::ostream &out, const uuid &value)
@@ -947,6 +954,8 @@ namespace lyf
 	{
 		using Valt = _Valt;
 
+		inline static size_t const SIZE = sizeof(Valt);
+
 		inline static void serialize(std::ofstream &outf, const Valt &value)
 		{
 			outf.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
@@ -970,6 +979,8 @@ namespace lyf
 	{
 		using Valt = std::tuple<Types...>;
 
+		inline static size_t const SIZE = SerialSize_v<Types...>;
+
 		inline static void serialize(std::ofstream &outf, const Valt &value)
 		{
 			writeTupleToFile(outf, value);
@@ -992,6 +1003,8 @@ namespace lyf
 	struct Serializer<uuid>
 	{
 		using Valt = uuid;
+
+		inline static size_t const SIZE = uuid::SIZE;
 
 		inline static void serialize(std::ofstream &outf, const Valt &value)
 		{
