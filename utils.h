@@ -820,8 +820,8 @@ namespace lyf
 		_traversalTuple_Recursive(reinterpret_cast<const std::tuple<_Rest...>&>(tuple), func);
 	}
 
-	template<typename _Func, typename... Types>
-	void traversalTuple(const std::tuple<Types...> &tuple, _Func func)
+	template<typename _Func, typename... _Types>
+	void traversalTuple(const std::tuple<_Types...> &tuple, _Func func)
 	{
 		_traversalTuple_Recursive(tuple, func);
 	}
@@ -838,28 +838,31 @@ namespace lyf
 		_traversalTuple_Recursive(reinterpret_cast<std::tuple<_Rest...>&>(tuple), func);
 	}
 
-	template<typename _Func, typename... Types>
-	void traversalTuple(std::tuple<Types...> &tuple, _Func func)
+	template<typename _Func, typename... _Types>
+	void traversalTuple(std::tuple<_Types...> &tuple, _Func func)
 	{
 		_traversalTuple_Recursive(tuple, func);
 	}
 
 
-	template<typename _This = void, typename... _Rest>
-	struct SerialSize
+	template<typename... _Types>
+	struct SerialSize;
+
+	template<typename _This, typename... _Rest>
+	struct SerialSize<_This, _Rest...>
 	{
-		static const size_t value = sizeof(_This) + SerialSize<_Rest...>::value;
+		static constexpr size_t value = sizeof(_This) + SerialSize<_Rest...>::value;
 	};
 
 	template<>
-	struct SerialSize<void>
+	struct SerialSize<>
 	{
-		static const size_t value = 0;
+		static constexpr size_t value = 0;
 	};
 	
+	template<typename... _Types>
+	inline constexpr size_t SerialSize_v = SerialSize<_Types...>::value;
 
-	template<typename... Types>
-	const size_t SerialSize_v = SerialSize<Types...>::value;
 
 	class uuid
 	{
