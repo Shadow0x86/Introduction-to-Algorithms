@@ -12,7 +12,6 @@
 
 namespace lyf
 {
-	using std::filesystem::path;
 
 	template<typename _KeyType>
 	class BTree;
@@ -310,8 +309,8 @@ namespace lyf
 		using id_type = typename Node::id_type;
 
 	public:
-		BTree(const string &dir)
-			: _Dir(dir.size() ? dir : "."), _Root()
+		BTree(const path &dir)
+			: _Dir(std::filesystem::absolute(dir)), _Root()
 		{
 			if (std::filesystem::is_regular_file(_Dir))
 				throw std::invalid_argument("dir");
@@ -332,6 +331,9 @@ namespace lyf
 			}
 			_Root->load(dir);
 		}
+
+		BTree(const BTree &) = delete;
+		BTree &operator=(const BTree &) = delete;
 
 		std::pair<NodePtr, size_t> search(const key_type &key) const
 		{
@@ -406,7 +408,7 @@ namespace lyf
 			}
 		}
 
-		std::filesystem::path const _Dir;
+		path const _Dir;
 		NodePtr _Root;
 	};
 }
