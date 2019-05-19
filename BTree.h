@@ -12,6 +12,8 @@
 
 namespace lyf
 {
+	using std::filesystem::path;
+
 	template<typename _KeyType>
 	class BTree;
 
@@ -64,9 +66,9 @@ namespace lyf
 			return this->KeySize() == this->t() * 2 - 1;
 		}
 
-		virtual void save(const string &dir) const = 0;
+		virtual void save(const path &dir) const = 0;
 
-		virtual void load(const string &dir) = 0;
+		virtual void load(const path &dir) = 0;
 
 		virtual void discard()
 		{
@@ -122,11 +124,10 @@ namespace lyf
 			static_assert((_MyBase::PAGE_SIZE - Serializer<size_t>::SIZE) / Serializer<_KeyType>::SIZE > 0);
 		}
 
-		void save(const string &dir) const override
+		void save(const path &dir) const override
 		{
 			size_t n = this->_KeyCont.size();
-			string path = dir + this->_pID->hex();
-			std::ofstream outf(path, std::ofstream::binary);
+			std::ofstream outf(dir / this->_pID->hex(), std::ofstream::binary);
 			Serializer<size_t>::serialize(outf, n);
 			for (const auto &t : this->_KeyCont)
 			{
@@ -135,12 +136,11 @@ namespace lyf
 			outf.close();
 		}
 
-		void load(const string &dir) override
+		void load(const path &dir) override
 		{
 			if (this->_Loaded)
 				return;
-			string path = dir + this->_pID->hex();
-			std::ifstream inf(path, std::ifstream::binary);
+			std::ifstream inf(dir / this->_pID->hex(), std::ifstream::binary);
 			if (inf)
 			{
 				size_t n;
@@ -204,11 +204,10 @@ namespace lyf
 				/ (Serializer<_KeyType>::SIZE + Serializer<id_type>::SIZE) > 0);
 		}
 
-		void save(const string &dir) const override
+		void save(const path &dir) const override
 		{
 			size_t n = this->_KeyCont.size();
-			string path = dir + this->_pID->hex();
-			std::ofstream outf(path, std::ofstream::binary);
+			std::ofstream outf(dir / this->_pID->hex(), std::ofstream::binary);
 			Serializer<size_t>::serialize(outf, n);
 			for (const auto &t : this->_KeyCont)
 			{
@@ -221,12 +220,11 @@ namespace lyf
 			outf.close();
 		}
 
-		void load(const string &dir) override
+		void load(const path &dir) override
 		{
 			if (this->_Loaded)
 				return;
-			string path = dir + this->_pID->hex();
-			std::ifstream inf(path, std::ifstream::binary);
+			std::ifstream inf(dir / this->_pID->hex(), std::ifstream::binary);
 			if (inf)
 			{
 				size_t n;
@@ -247,7 +245,7 @@ namespace lyf
 			this->_Loaded = true;
 		}
 
-		void loadChild(size_t i, const string &dir)
+		void loadChild(size_t i, const path &dir)
 		{
 			if (!this->_ChildPtrCont[i])
 			{
@@ -256,7 +254,7 @@ namespace lyf
 			this->_ChildPtrCont[i]->load(dir);
 		}
 
-		void splitChild(size_t i, const string &dir)
+		void splitChild(size_t i, const path &dir)
 		{
 			auto y = _ChildPtrCont[i];
 			child_ptr_t z;
@@ -313,9 +311,12 @@ namespace lyf
 
 	public:
 		BTree(const string &dir)
-			: _Dir(dir), _Root()
+			: _Dir(dir.size() ? dir : "."), _Root()
 		{
-			string rootpath = dir + "root";
+			if (std::filesystem::is_regular_file(_Dir))
+				throw std::invalid_argument("dir");
+			std::filesystem::create_directory(_Dir);
+			auto rootpath = _Dir / "root";
 			std::ifstream inf(rootpath, std::ifstream::binary);
 			if (inf)
 			{
@@ -405,7 +406,7 @@ namespace lyf
 			}
 		}
 
-		string const _Dir;
+		std::filesystem::path const _Dir;
 		NodePtr _Root;
 	};
 }
