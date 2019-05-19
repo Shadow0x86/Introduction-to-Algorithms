@@ -1035,6 +1035,11 @@ namespace lyf
 		FileModifier(const path &_path)
 			: _Path(_path), _f()
 		{
+			if (!std::filesystem::exists(_Path))
+			{
+				_f.open(_Path, std::fstream::out | std::fstream::trunc);
+				_f.close();
+			}
 			_open();
 		}
 
@@ -1061,11 +1066,29 @@ namespace lyf
 			pos = std::min(total, pos);
 			size_t sz = total - pos;
 			std::unique_ptr<char[]> p(new char[sz]);
-			_f.seekg(pos);
-			_f.read(p.get(), sz);
+			read(pos, p.get(), sz);
 			_f.seekp(pos);
 			_f.write(data, size);
 			_f.write(p.get(), sz);
+		}
+
+		void read(size_t pos, char *data, size_t size)
+		{
+			_f.seekg(pos);
+			_f.read(data, size);
+		}
+
+		void copy(size_t pos, size_t size, FileModifier &rhs)
+		{
+			std::unique_ptr<char[]> p(new char[size]);
+			read(pos, p.get(), size);
+			rhs.append(p.get(), size);
+		}
+
+		void resize(size_t size)
+		{
+			_f.flush();
+			std::filesystem::resize_file(_Path, size);
 		}
 
 	private:
@@ -1074,11 +1097,6 @@ namespace lyf
 
 		void _open()
 		{
-			if (!std::filesystem::exists(_Path))
-			{
-				_f.open(_Path, std::fstream::out | std::fstream::trunc);
-				_f.close();
-			}
 			_f.open(_Path, std::fstream::in | std::fstream::out | std::fstream::binary);
 			if (!_f.is_open())
 				throw std::runtime_error("Fail to open file");
