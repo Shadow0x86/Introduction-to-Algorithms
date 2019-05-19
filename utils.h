@@ -8,6 +8,7 @@
 #include <chrono>
 #include <utility>
 #include <random>
+#include <filesystem>
 
 
 #define INLINE inline
@@ -1021,6 +1022,44 @@ namespace lyf
 		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
 		{
 			return std::make_unique<Valt>(inf);
+		}
+	};
+
+
+	using std::filesystem::path;
+
+
+	class FileModifier
+	{
+	public:
+		FileModifier(const path &_path)
+			: _Path(_path), _f()
+		{
+			_open();
+		}
+
+		~FileModifier()
+		{
+			_f.close();
+		}
+
+		void append(const char *data, size_t size)
+		{
+			_f.seekp(0, std::fstream::end);
+			_f.write(data, size);
+		}
+
+		void insert(size_t pos, const char *data, size_t size);
+
+	private:
+		path const _Path;
+		std::fstream _f;
+
+		void _open()
+		{
+			_f.open(_Path, std::fstream::in | std::fstream::out | std::fstream::trunc | std::fstream::binary);
+			if (!_f.is_open())
+				throw std::runtime_error("Fail to open file");
 		}
 	};
 
