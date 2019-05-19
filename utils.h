@@ -1043,13 +1043,30 @@ namespace lyf
 			_f.close();
 		}
 
+		size_t size()
+		{
+			_f.seekg(0, std::fstream::end);
+			return _f.tellg();
+		}
+
 		void append(const char *data, size_t size)
 		{
 			_f.seekp(0, std::fstream::end);
 			_f.write(data, size);
 		}
 
-		void insert(size_t pos, const char *data, size_t size);
+		void insert(size_t pos, const char *data, size_t size)
+		{
+			auto total = this->size();
+			pos = std::min(total, pos);
+			size_t sz = total - pos;
+			std::unique_ptr<char[]> p(new char[sz]);
+			_f.seekg(pos);
+			_f.read(p.get(), sz);
+			_f.seekp(pos);
+			_f.write(data, size);
+			_f.write(p.get(), sz);
+		}
 
 	private:
 		path const _Path;
@@ -1057,7 +1074,12 @@ namespace lyf
 
 		void _open()
 		{
-			_f.open(_Path, std::fstream::in | std::fstream::out | std::fstream::trunc | std::fstream::binary);
+			if (!std::filesystem::exists(_Path))
+			{
+				_f.open(_Path, std::fstream::out | std::fstream::trunc);
+				_f.close();
+			}
+			_f.open(_Path, std::fstream::in | std::fstream::out | std::fstream::binary);
 			if (!_f.is_open())
 				throw std::runtime_error("Fail to open file");
 		}
