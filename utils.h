@@ -989,6 +989,11 @@ namespace lyf
 			inf.read(reinterpret_cast<char*>(&value), sizeof(Valt));
 		}
 
+		inline static void unserialize(const string &raw, Valt &value)
+		{
+			memcpy(&value, raw.data(), sizeof(Valt));
+		}
+
 		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
 		{
 			std::unique_ptr<Valt> ret(new Valt);
@@ -1028,6 +1033,12 @@ namespace lyf
 			readTupleFromFile(inf, value);
 		}
 
+		inline static void unserialize(const string &raw, Valt &value)
+		{
+			std::stringstream ss(raw);
+			traversalTuple(value, [&](auto &e) { ss.read(reinterpret_cast<char*>(&e), sizeof(e)); });
+		}
+
 		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
 		{
 			std::unique_ptr<Valt> ret(new Valt);
@@ -1059,10 +1070,6 @@ namespace lyf
 		inline static string serialize(const Valt &value)
 		{
 			return value.toRawString();
-		}
-
-		inline static void unserialize(std::ifstream &inf, Valt &value)
-		{
 		}
 
 		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
