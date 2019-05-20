@@ -1106,7 +1106,7 @@ namespace lyf
 			_f.close();
 		}
 
-		path getPath() const
+		const path &getPath() const
 		{
 			return _Path;
 		}
