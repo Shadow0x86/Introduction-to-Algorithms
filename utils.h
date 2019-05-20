@@ -881,6 +881,11 @@ namespace lyf
 			inf.read(_Data, SIZE);
 		}
 
+		uuid(const string &raw)
+		{
+			memcpy(_Data, raw.data(), SIZE);
+		}
+
 		uuid(const uuid &) = delete;
 		uuid &operator=(const uuid &) = delete;
 
@@ -915,6 +920,13 @@ namespace lyf
 			outf.write(_Data, SIZE);
 			if (flush)
 				outf.flush();
+		}
+
+		inline string toRawString() const
+		{
+			std::stringstream ss;
+			ss.write(_Data, SIZE);
+			return ss.str();
 		}
 
 		inline static size_t const SIZE = 16;
@@ -965,6 +977,13 @@ namespace lyf
 			outf.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
 		}
 
+		inline static string serialize(const Valt &value)
+		{
+			std::stringstream ss;
+			ss.write(reinterpret_cast<const char*>(&value), sizeof(Valt));
+			return ss.str();
+		}
+
 		inline static void unserialize(std::ifstream &inf, Valt &value)
 		{
 			inf.read(reinterpret_cast<char*>(&value), sizeof(Valt));
@@ -975,6 +994,13 @@ namespace lyf
 			std::unique_ptr<Valt> ret(new Valt);
 			inf.read(reinterpret_cast<char*>(ret.get()), sizeof(Valt));
 			return ret;
+		}
+
+		inline static std::unique_ptr<Valt> unserialize(const string &raw)
+		{
+			auto p = malloc(sizeof(Valt));
+			memcpy(p, raw.data(), sizeof(Valt));
+			return std::unique_ptr<Valt>(reinterpret_cast<Valt*>(p));
 		}
 	};
 
@@ -990,6 +1016,13 @@ namespace lyf
 			writeTupleToFile(outf, value);
 		}
 
+		inline static string serialize(const Valt &value)
+		{
+			std::stringstream ss;
+			traversalTuple(value, [&](const auto &e) { ss.write(reinterpret_cast<const char*>(&e), sizeof(e)); });
+			return ss.str();
+		}
+
 		inline static void unserialize(std::ifstream &inf, Valt &value)
 		{
 			readTupleFromFile(inf, value);
@@ -1000,6 +1033,14 @@ namespace lyf
 			std::unique_ptr<Valt> ret(new Valt);
 			readTupleFromFile(inf, *ret);
 			return ret;
+		}
+
+		inline static std::unique_ptr<Valt> unserialize(const string &raw)
+		{
+			auto tp = reinterpret_cast<Valt*>(malloc(sizeof(Valt)));
+			std::stringstream ss(raw);
+			traversalTuple(*tp, [&](auto &e) { ss.read(reinterpret_cast<char*>(&e), sizeof(e)); });
+			return std::unique_ptr<Valt>(tp);
 		}
 	};
 
@@ -1015,6 +1056,11 @@ namespace lyf
 			value.toFile(outf);
 		}
 
+		inline static string serialize(const Valt &value)
+		{
+			return value.toRawString();
+		}
+
 		inline static void unserialize(std::ifstream &inf, Valt &value)
 		{
 		}
@@ -1022,6 +1068,11 @@ namespace lyf
 		inline static std::unique_ptr<Valt> unserialize(std::ifstream &inf)
 		{
 			return std::make_unique<Valt>(inf);
+		}
+
+		inline static std::unique_ptr<Valt> unserialize(const string &raw)
+		{
+			return std::make_unique<Valt>(raw);
 		}
 	};
 
@@ -1089,6 +1140,11 @@ namespace lyf
 		{
 			_f.flush();
 			std::filesystem::resize_file(_Path, size);
+		}
+
+		void truncate()
+		{
+			resize(0);
 		}
 
 	private:
