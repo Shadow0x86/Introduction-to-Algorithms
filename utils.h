@@ -1123,17 +1123,57 @@ namespace lyf
 			_f.write(p.get(), sz);
 		}
 
+		void seekg(size_t pos)
+		{
+			_f.seekg(pos);
+		}
+
 		void read(size_t pos, char *data, size_t size)
 		{
 			_f.seekg(pos);
 			_f.read(data, size);
 		}
 
-		void copy(size_t pos, size_t size, FileModifier &rhs)
+		void read(char *data, size_t size)
+		{
+			_f.read(data, size);
+		}
+
+		void seekp(size_t pos)
+		{
+			_f.seekp(pos);
+		}
+
+		void write(size_t pos, const char *data, size_t size)
+		{
+			_f.seekp(pos);
+			_f.write(data, size);
+		}
+
+		void write(const char *data, size_t size)
+		{
+			_f.write(data, size);
+		}
+
+		void copy_append(size_t pos, size_t size, FileModifier &dst)
 		{
 			std::unique_ptr<char[]> p(new char[size]);
 			read(pos, p.get(), size);
-			rhs.append(p.get(), size);
+			dst.append(p.get(), size);
+		}
+
+		void copy_insert(size_t pos, size_t size, FileModifier &dst, size_t dst_pos)
+		{
+			std::unique_ptr<char[]> p(new char[size]);
+			read(pos, p.get(), size);
+			dst.insert(dst_pos, p.get(), size);
+		}
+
+		void copy_rewrite(size_t pos, size_t size, FileModifier &dst, size_t dst_pos)
+		{
+			std::unique_ptr<char[]> p(new char[size]);
+			read(pos, p.get(), size);
+			dst.write(dst_pos, p.get(), size);
 		}
 
 		void resize(size_t size)
