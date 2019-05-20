@@ -1106,6 +1106,11 @@ namespace lyf
 			_f.close();
 		}
 
+		path getPath() const
+		{
+			return _Path;
+		}
+
 		size_t size()
 		{
 			_f.seekg(0, std::fstream::end);

@@ -25,16 +25,16 @@ namespace lyf
 		using key_type = _KeyType;
 		using key_cont = std::vector<key_type>;
 		using id_type = lyf::uuid;
-		using id_ptr_type = const id_type *;
+		using id_ptr_type = std::shared_ptr<const id_type>;
 
 	public:
-		BTreeNode()
-			: _pID(new id_type), _KeyCont(), _Loaded(false)
+		BTreeNode(const path &dir)
+			: _pID(new id_type), _KeyCont(), _Loaded(false), _FileModifier(dir / _pID->hex())
 		{
 		}
 
-		BTreeNode(const id_type *id)
-			: _pID(id), _KeyCont(), _Loaded(false)
+		BTreeNode(id_ptr_type id, const path &dir)
+			: _pID(id), _KeyCont(), _Loaded(false), _FileModifier(dir / _pID->hex())
 		{
 		}
 
@@ -65,9 +65,9 @@ namespace lyf
 			return this->KeySize() == this->t() * 2 - 1;
 		}
 
-		virtual void save(const path &dir) const = 0;
+		virtual void save() = 0;
 
-		virtual void load(const path &dir) = 0;
+		virtual void load() = 0;
 
 		virtual void discard()
 		{
@@ -75,9 +75,10 @@ namespace lyf
 			this->_Loaded = false;
 		}
 
-		std::unique_ptr<const id_type> const _pID;
+		id_ptr_type const _pID;
 		key_cont _KeyCont;
 		bool _Loaded;
+		FileModifier _FileModifier;
 		inline static const size_t PAGE_SIZE = 4096;
 	};
 
@@ -94,8 +95,8 @@ namespace lyf
 		using id_type = typename _MyBase::id_type;
 		using id_ptr_type = typename _MyBase::id_ptr_type;
 		
-		BTreeLeafNode()
-			: _MyBase()
+		BTreeLeafNode(const path &dir)
+			: _MyBase(dir)
 		{
 			this->_static_assert();
 		}
@@ -111,8 +112,8 @@ namespace lyf
 		}
 
 	private:
-		BTreeLeafNode(const id_type *id)
-			: _MyBase(id)
+		BTreeLeafNode(id_ptr_type id, const path &dir)
+			: _MyBase(id, dir)
 		{
 			this->_static_assert();
 		}
@@ -123,34 +124,34 @@ namespace lyf
 			static_assert((_MyBase::PAGE_SIZE - Serializer<size_t>::SIZE) / Serializer<_KeyType>::SIZE > 0);
 		}
 
-		void save(const path &dir) const override
+		void save() override
 		{
 			size_t n = this->_KeyCont.size();
-			std::ofstream outf(dir / this->_pID->hex(), std::ofstream::binary);
-			Serializer<size_t>::serialize(outf, n);
+			this->_FileModifier.truncate();
+			this->_FileModifier.append(reinterpret_cast<char*>(&n), sizeof(n));
 			for (const auto &t : this->_KeyCont)
 			{
-				Serializer<key_type>::serialize(outf, t);
+				auto s = lyf::Serializer<key_type>::serialize(t);
+				this->_FileModifier.write(s.data(), s.size());
 			}
-			outf.close();
 		}
 
-		void load(const path &dir) override
+		void load() override
 		{
 			if (this->_Loaded)
 				return;
-			std::ifstream inf(dir / this->_pID->hex(), std::ifstream::binary);
-			if (inf)
+			if (this->_FileModifier.size())
 			{
 				size_t n;
-				Serializer<size_t>::unserialize(inf, n);
+				this->_FileModifier.read(0, reinterpret_cast<char*>(&n), sizeof(n));
 				this->_KeyCont.resize(n);
+				string s(Serializer<key_type>::SIZE, '\0');
 				for (auto &t : this->_KeyCont)
 				{
-					Serializer<key_type>::unserialize(inf, t);
+					this->_FileModifier.read(s.data(), Serializer<key_type>::SIZE);
+					Serializer<key_type>::unserialize(s, t);
 				}
 			}
-			inf.close();
 			this->_Loaded = true;
 		}
 	};
@@ -171,8 +172,8 @@ namespace lyf
 		using child_ptr_t = std::shared_ptr<_MyBase>;
 		using child_ptr_cont = std::vector<child_ptr_t>;
 
-		BTreeInternalNode()
-			: _MyBase(), _ChildIdCont(), _ChildPtrCont()
+		BTreeInternalNode(const path &dir)
+			: _MyBase(dir), _ChildIdCont(), _ChildPtrCont()
 		{
 			this->_static_assert();
 		}
@@ -189,8 +190,8 @@ namespace lyf
 		}
 
 	private:
-		BTreeInternalNode(const id_type *id)
-			: _MyBase(id), _ChildIdCont(), _ChildPtrCont()
+		BTreeInternalNode(id_ptr_type id, const path &dir)
+			: _MyBase(id, dir), _ChildIdCont(), _ChildPtrCont()
 		{
 			this->_static_assert();
 		}
@@ -203,64 +204,70 @@ namespace lyf
 				/ (Serializer<_KeyType>::SIZE + Serializer<id_type>::SIZE) > 0);
 		}
 
-		void save(const path &dir) const override
+		void save() override
 		{
 			size_t n = this->_KeyCont.size();
-			std::ofstream outf(dir / this->_pID->hex(), std::ofstream::binary);
-			Serializer<size_t>::serialize(outf, n);
+			this->_FileModifier.truncate();
+			this->_FileModifier.append(reinterpret_cast<char*>(&n), sizeof(n));
 			for (const auto &t : this->_KeyCont)
 			{
-				Serializer<key_type>::serialize(outf, t);
+				auto s = lyf::Serializer<key_type>::serialize(t);
+				this->_FileModifier.write(s.data(), s.size());
 			}
 			for (auto idp : this->_ChildIdCont)
 			{
-				Serializer<id_type>::serialize(outf, *idp);
+				auto s = lyf::Serializer<id_type>::serialize(*idp);
+				this->_FileModifier.write(s.data(), s.size());
 			}
-			outf.close();
 		}
 
-		void load(const path &dir) override
+		void load() override
 		{
 			if (this->_Loaded)
 				return;
-			std::ifstream inf(dir / this->_pID->hex(), std::ifstream::binary);
-			if (inf)
+			if (this->_FileModifier.size())
 			{
 				size_t n;
-				Serializer<size_t>::unserialize(inf, n);
+				this->_FileModifier.read(0, reinterpret_cast<char*>(&n), sizeof(n));
 				this->_KeyCont.resize(n);
+				string s(Serializer<key_type>::SIZE, '\0');
 				for (auto &t : this->_KeyCont)
 				{
-					Serializer<key_type>::unserialize(inf, t);
+					this->_FileModifier.read(s.data(), Serializer<key_type>::SIZE);
+					Serializer<key_type>::unserialize(s, t);
 				}
 				this->_ChildIdCont.resize(n + 1);
 				this->_ChildPtrCont.resize(n + 1);
+				s.resize(Serializer<id_type>::SIZE);
 				for (auto &idp : this->_ChildIdCont)
 				{
-					idp = Serializer<id_type>::unserialize(inf).release();
+					this->_FileModifier.read(s.data(), Serializer<id_type>::SIZE);
+					idp.reset(Serializer<id_type>::unserialize(s).release());
 				}
 			}
-			inf.close();
 			this->_Loaded = true;
 		}
 
-		void loadChild(size_t i, const path &dir)
+		void loadChild(size_t i)
 		{
 			if (!this->_ChildPtrCont[i])
 			{
-				this->_ChildPtrCont[i].reset(new BTreeInternalNode(_ChildIdCont[i]));
+				auto dir = this->_FileModifier.getPath().parent_path();
+				this->_ChildPtrCont[i].reset(new BTreeInternalNode(_ChildIdCont[i], dir));
+				//TODO
 			}
-			this->_ChildPtrCont[i]->load(dir);
+			this->_ChildPtrCont[i]->load();
 		}
 
-		void splitChild(size_t i, const path &dir)
+		void splitChild(size_t i)
 		{
 			auto y = _ChildPtrCont[i];
 			child_ptr_t z;
+			auto dir = this->_FileModifier.getPath().parent_path();
 			if (y->isLeaf())
-				z.reset(new BTreeLeafNode<key_type>);
+				z.reset(new BTreeLeafNode<key_type>(dir));
 			else
-				z.reset(new BTreeInternalNode);
+				z.reset(new BTreeInternalNode(dir));
 			auto t = y->t();
 			size_t newkeysize = t - 1;
 			z->_KeyCont.resize(newkeysize);
@@ -280,11 +287,11 @@ namespace lyf
 			}
 			this->_KeyCont.insert(_KeyCont.begin() + i, std::move(y->_KeyCont[newkeysize]));
 			y->_KeyCont.resize(newkeysize);
-			this->_ChildIdCont.insert(_ChildIdCont.begin() + i + 1, z->_pID.get());
+			this->_ChildIdCont.insert(_ChildIdCont.begin() + i + 1, z->_pID);
 			this->_ChildPtrCont.insert(_ChildPtrCont.begin() + i + 1, z);
-			this->save(dir);
-			y->save(dir);
-			z->save(dir);
+			this->save();
+			y->save();
+			z->save();
 		}
 
 		void discard() override
@@ -320,16 +327,16 @@ namespace lyf
 			if (inf)
 			{
 				auto idp = Serializer<id_type>::unserialize(inf);
-				_Root.reset(new BTreeLeafNode<key_type>(idp.release()));
+				_Root.reset(new BTreeLeafNode<key_type>(typename Node::id_ptr_type(idp.release()), _Dir));
 			}
 			else
 			{
-				_Root.reset(new BTreeLeafNode<key_type>);
+				_Root.reset(new BTreeLeafNode<key_type>(_Dir));
 				std::ofstream outf(rootpath, std::ofstream::binary);
 				Serializer<id_type>::serialize(outf, *(_Root->_pID));
 				outf.close();
 			}
-			_Root->load(dir);
+			_Root->load();
 		}
 
 		BTree(const BTree &) = delete;
@@ -345,11 +352,11 @@ namespace lyf
 			auto np = _Root;
 			if (np->isFull())
 			{
-				auto p = new BTreeInternalNode<key_type>;
+				auto p = new BTreeInternalNode<key_type>(_Dir);
 				_Root.reset(p);
-				p->_ChildIdCont.push_back(np->_pID.get());
+				p->_ChildIdCont.push_back(np->_pID);
 				p->_ChildPtrCont.push_back(np);
-				p->splitChild(0, _Dir);
+				p->splitChild(0);
 				_insertNonFull(_Root, key);
 			}
 			else
@@ -377,7 +384,7 @@ namespace lyf
 			else
 			{
 				auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-				p->loadChild(i, this->_Dir);
+				p->loadChild(i);
 				return _searchRecursive(key, p->_ChildPtrCont[i]);
 			}
 		}
@@ -390,17 +397,17 @@ namespace lyf
 				while (i != np->KeySize() && key > np->key(i))
 					i++;
 				np->_KeyCont.insert(np->_KeyCont.begin() + i, key);
-				np->save(this->_Dir);
+				np->save();
 			}
 			else
 			{
 				while (i != np->KeySize() && key > np->key(i))
 					i++;
 				auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-				p->loadChild(i, this->_Dir);
+				p->loadChild(i);
 				if (p->_ChildPtrCont[i]->isFull())
 				{
-					p->splitChild(i, this->_Dir);
+					p->splitChild(i);
 					if (key > p->key(i))
 						i++;
 				}
