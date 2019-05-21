@@ -349,7 +349,23 @@ namespace lyf
 
 		std::pair<NodePtr, size_t> search(const key_type &key) const
 		{
-			return _searchRecursive(key, _Root);
+			auto np = _Root;
+			while (true)
+			{
+				size_t i = 0;
+				while (i != np->KeySize() && key > np->key(i))
+					i++;
+				if (i != np->KeySize() && key == np->key(i))
+					return { np,i };
+				else if (np->isLeaf())
+					return { nullptr,0 };
+				else
+				{
+					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
+					p->loadChild(i);
+					np = p->_ChildPtrCont[i];
+				}
+			}
 		}
 
 		void insert(const key_type &key)
@@ -411,46 +427,33 @@ namespace lyf
 			_Root->load();
 		}
 
-		std::pair<NodePtr, size_t> _searchRecursive(const key_type &key, NodePtr np) const
-		{
-			size_t i = 0;
-			while (i != np->KeySize() && key > np->key(i))
-				i++;
-			if (i != np->KeySize() && key == np->key(i))
-				return { np,i };
-			else if (np->isLeaf())
-				return { nullptr,0 };
-			else
-			{
-				auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-				p->loadChild(i);
-				return _searchRecursive(key, p->_ChildPtrCont[i]);
-			}
-		}
-
 		void _insertNonFull(NodePtr np, const key_type &key)
 		{
-			size_t i = 0;
-			if (np->isLeaf())
+			while (true)
 			{
-				while (i != np->KeySize() && key > np->key(i))
-					i++;
-				np->_KeyCont.insert(np->_KeyCont.begin() + i, key);
-				np->save();
-			}
-			else
-			{
-				while (i != np->KeySize() && key > np->key(i))
-					i++;
-				auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-				p->loadChild(i);
-				if (p->_ChildPtrCont[i]->isFull())
+				size_t i = 0;
+				if (np->isLeaf())
 				{
-					p->splitChild(i);
-					if (key > p->key(i))
+					while (i != np->KeySize() && key > np->key(i))
 						i++;
+					np->_KeyCont.insert(np->_KeyCont.begin() + i, key);
+					np->save();
+					return;
 				}
-				_insertNonFull(p->_ChildPtrCont[i], key);
+				else
+				{
+					while (i != np->KeySize() && key > np->key(i))
+						i++;
+					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
+					p->loadChild(i);
+					if (p->_ChildPtrCont[i]->isFull())
+					{
+						p->splitChild(i);
+						if (key > p->key(i))
+							i++;
+					}
+					np = p->_ChildPtrCont[i];
+				}
 			}
 		}
 
