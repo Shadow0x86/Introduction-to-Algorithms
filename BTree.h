@@ -301,6 +301,8 @@ namespace lyf
 					zp->_ChildIdCont[i] = std::move(yp->_ChildIdCont[i + t]);
 					zp->_ChildPtrCont[i] = std::move(yp->_ChildPtrCont[i + t]);
 				}
+				yp->_ChildIdCont.resize(t);
+				yp->_ChildPtrCont.resize(t);
 			}
 			this->_KeyCont.insert(_KeyCont.begin() + i, std::move(y->_KeyCont[newkeysize]));
 			y->_KeyCont.resize(newkeysize);
