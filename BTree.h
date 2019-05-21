@@ -78,7 +78,7 @@ namespace lyf
 		id_ptr_type const _pID;
 		key_cont _KeyCont;
 		bool _Loaded;
-		FileModifier _FileModifier;
+		lyf::FileModifier _FileModifier;
 		inline static const size_t PAGE_SIZE = 4096;
 	};
 
@@ -127,6 +127,19 @@ namespace lyf
 		{
 			static_assert(_MyBase::PAGE_SIZE > Serializer<size_t>::SIZE);
 			static_assert((_MyBase::PAGE_SIZE - Serializer<size_t>::SIZE) / Serializer<_KeyType>::SIZE > 0);
+		}
+
+		void insert(const key_type &key)
+		{
+			size_t i = 0;
+			while (i != _KeyCont.size() && key > _KeyCont[i])
+				i++;
+			_KeyCont.insert(_KeyCont.begin() + i, key);
+			size_t pos = lyf::Serializer<size_t>::SIZE + lyf::Serializer<key_type>::SIZE * i;
+			auto s = lyf::Serializer<key_type>::serialize(key);
+			size_t n = _KeyCont.size();
+			this->_FileModifier.write(0, reinterpret_cast<char*>(&n), sizeof(n));
+			this->_FileModifier.insert(pos, s.data(), s.size());
 		}
 
 		void save() override
@@ -431,17 +444,14 @@ namespace lyf
 		{
 			while (true)
 			{
-				size_t i = 0;
 				if (np->isLeaf())
 				{
-					while (i != np->KeySize() && key > np->key(i))
-						i++;
-					np->_KeyCont.insert(np->_KeyCont.begin() + i, key);
-					np->save();
+					dynamic_cast<BTreeLeafNode<key_type>*>(np.get())->insert(key);
 					return;
 				}
 				else
 				{
+					size_t i = 0;
 					while (i != np->KeySize() && key > np->key(i))
 						i++;
 					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
