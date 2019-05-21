@@ -341,30 +341,7 @@ namespace lyf
 		{
 			if (std::filesystem::is_regular_file(_Dir))
 				throw std::invalid_argument("dir");
-			std::filesystem::create_directory(_Dir);
-			auto rootpath = _Dir / ROOT_FILE_NAME;
-			std::ifstream inf(rootpath, std::ifstream::binary);
-			if (inf.is_open())
-			{
-				bool isLeaf;
-				Serializer<bool>::unserialize(inf, isLeaf);
-				auto idp = Serializer<id_type>::unserialize(inf);
-				if (isLeaf)
-					_Root.reset(new BTreeLeafNode<key_type>(_Dir, typename Node::id_ptr_type(idp.release())));
-				else
-					_Root.reset(new BTreeInternalNode<key_type>(_Dir, typename Node::id_ptr_type(idp.release())));
-			}
-			else
-			{
-				_Root.reset(new BTreeLeafNode<key_type>(_Dir));
-				std::ofstream outf(rootpath, std::ofstream::binary);
-				if (!outf.is_open())
-					throw std::runtime_error("Fail to create file " + ROOT_FILE_NAME);
-				Serializer<bool>::serialize(outf, _Root->isLeaf());
-				Serializer<id_type>::serialize(outf, *(_Root->_pID));
-				outf.close();
-			}
-			_Root->load();
+			this->_loadRoot();
 		}
 
 		BTree(const BTree &) = delete;
@@ -398,13 +375,42 @@ namespace lyf
 
 		void discard()
 		{
-			_Root = nullptr;
-			//TODO:remove all files
+			_Root.reset();
+			std::filesystem::remove_all(_Dir);
+			this->_loadRoot();
 		}
 
 		inline static string const ROOT_FILE_NAME = "root";
 
 	private:
+		void _loadRoot()
+		{
+			std::filesystem::create_directory(_Dir);
+			auto rootpath = _Dir / ROOT_FILE_NAME;
+			std::ifstream inf(rootpath, std::ifstream::binary);
+			if (inf.is_open())
+			{
+				bool isLeaf;
+				Serializer<bool>::unserialize(inf, isLeaf);
+				auto idp = Serializer<id_type>::unserialize(inf);
+				if (isLeaf)
+					_Root.reset(new BTreeLeafNode<key_type>(_Dir, typename Node::id_ptr_type(idp.release())));
+				else
+					_Root.reset(new BTreeInternalNode<key_type>(_Dir, typename Node::id_ptr_type(idp.release())));
+			}
+			else
+			{
+				_Root.reset(new BTreeLeafNode<key_type>(_Dir));
+				std::ofstream outf(rootpath, std::ofstream::binary);
+				if (!outf.is_open())
+					throw std::runtime_error("Fail to create file " + ROOT_FILE_NAME);
+				Serializer<bool>::serialize(outf, _Root->isLeaf());
+				Serializer<id_type>::serialize(outf, *(_Root->_pID));
+				outf.close();
+			}
+			_Root->load();
+		}
+
 		std::pair<NodePtr, size_t> _searchRecursive(const key_type &key, NodePtr np) const
 		{
 			size_t i = 0;
