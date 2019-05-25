@@ -400,7 +400,10 @@ namespace lyf
 				_insertNonFull(np, key);
 		}
 
-		void remove(const key_type &key);
+		void remove(const key_type &key)
+		{
+			_recursiveRemove(_Root, key);
+		}
 
 		void discard()
 		{
@@ -463,6 +466,38 @@ namespace lyf
 							i++;
 					}
 					np = p->_ChildPtrCont[i];
+				}
+			}
+		}
+
+		void _recursiveRemove(NodePtr np, const key_type &key)
+		{
+			np->load();
+			size_t i = 0;
+			while (i != np->KeySize() && key > np->key(i))
+				i++;
+			if (i != np->KeySize())
+			{
+				if (np->isLeaf())
+				{
+					np->_KeyCont.erase(np->_KeyCont.begin() + i);
+					np->save();
+					return;
+				}
+				else
+				{
+					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
+					p->_ChildPtrCont[i]->load();
+					if ((size_t sz = p->_ChildPtrCont[i]->KeySize()) >= p->_ChildPtrCont[i]->t())
+					{
+						p->_KeyCont[i] = p->_ChildPtrCont[i]->key(sz - 1);
+						_recursiveRemove(p->_ChildPtrCont[i], p->_KeyCont[i]);
+						return;
+					}
+					else
+					{
+
+					}
 				}
 			}
 		}
