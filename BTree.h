@@ -279,7 +279,7 @@ namespace lyf
 			this->_Loaded = true;
 		}
 
-		void loadChild(size_t i)
+		child_ptr_t loadChild(size_t i)
 		{
 			if (!this->_ChildPtrCont[i])
 			{
@@ -292,6 +292,7 @@ namespace lyf
 				this->_ChildPtrCont[i].reset(p);
 			}
 			this->_ChildPtrCont[i]->load();
+			return this->_ChildPtrCont[i];
 		}
 
 		void splitChild(size_t i)
@@ -380,8 +381,7 @@ namespace lyf
 				else
 				{
 					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-					p->loadChild(i);
-					np = p->_ChildPtrCont[i];
+					np = p->loadChild(i);
 				}
 			}
 		}
@@ -465,14 +465,13 @@ namespace lyf
 					while (i != np->KeySize() && key > np->key(i))
 						i++;
 					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-					p->loadChild(i);
-					if (p->_ChildPtrCont[i]->isFull())
+					np = p->loadChild(i);
+					if (np->isFull())
 					{
 						p->splitChild(i);
 						if (key > p->key(i))
 							i++;
 					}
-					np = p->_ChildPtrCont[i];
 				}
 			}
 		}
@@ -494,16 +493,14 @@ namespace lyf
 				{
 					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
 					size_t sz;
-					auto pLeftChild = p->_ChildPtrCont[i];
-					pLeftChild->load();
+					auto pLeftChild = p->loadChild(i);
 					if ((sz = pLeftChild->KeySize()) >= pLeftChild->t())
 					{
 						p->_KeyCont[i] = pLeftChild->key(sz - 1);
 						_recursiveRemove(pLeftChild, p->_KeyCont[i]);
 						return;
 					}
-					auto pRightChild = p->_ChildPtrCont[i + 1];
-					pRightChild->load();
+					auto pRightChild = p->loadChild(i + 1);
 					if ((sz = pRightChild->KeySize()) >= pRightChild->t())
 					{
 						p->_KeyCont[i] = pRightChild->key(0);
@@ -528,15 +525,22 @@ namespace lyf
 					p->_KeyCont.erase(p->_KeyCont.begin() + i);
 					p->_ChildIdCont.erase(p->_ChildIdCont.begin() + i + 1);
 					p->_ChildPtrCont.erase(p->_ChildPtrCont.begin() + i + 1);
-					p->save();
+					if (!p->KeySize())
+					{
+						p->removeFile();
+						_Root.reset(pLeftChild);
+						_saveRoot();
+					}
+					else
+						p->save();
 					_recursiveRemove(pLeftChild, key);
 				}
 				return;
 			}
-			else
+			else if (!np->isLeaf())
 			{
-				auto pChild = np->_ChildPtrCont[i];
-				pChild->load();
+				auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
+				auto pChild = p->loadChild(i);
 				if (pChild->KeySize() < pChild->t())
 				{
 
