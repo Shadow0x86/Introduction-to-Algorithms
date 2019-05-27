@@ -69,6 +69,11 @@ namespace lyf
 
 		virtual void load() = 0;
 
+		void removeFile()
+		{
+			std::filesystem::remove(_FileModifier.getPath());
+		}
+
 		virtual void discard()
 		{
 			_KeyCont.clear();
@@ -391,9 +396,7 @@ namespace lyf
 				p->_ChildIdCont.push_back(np->_pID);
 				p->_ChildPtrCont.push_back(np);
 				p->splitChild(0);
-				std::ofstream outf(_Dir / ROOT_FILE_NAME, std::ofstream::binary);
-				Serializer<bool>::serialize(outf, _Root->isLeaf());
-				Serializer<id_type>::serialize(outf, *(_Root->_pID));
+				_saveRoot();
 				_insertNonFull(_Root, key);
 			}
 			else
@@ -418,8 +421,7 @@ namespace lyf
 		void _loadRoot()
 		{
 			std::filesystem::create_directory(_Dir);
-			auto rootpath = _Dir / ROOT_FILE_NAME;
-			std::ifstream inf(rootpath, std::ifstream::binary);
+			std::ifstream inf(_Dir / ROOT_FILE_NAME, std::ifstream::binary);
 			if (inf.is_open())
 			{
 				bool isLeaf;
@@ -433,14 +435,19 @@ namespace lyf
 			else
 			{
 				_Root.reset(new BTreeLeafNode<key_type>(_Dir));
-				std::ofstream outf(rootpath, std::ofstream::binary);
-				if (!outf.is_open())
-					throw std::runtime_error("Fail to create file " + ROOT_FILE_NAME);
-				Serializer<bool>::serialize(outf, _Root->isLeaf());
-				Serializer<id_type>::serialize(outf, *(_Root->_pID));
-				outf.close();
+				_saveRoot();
 			}
 			_Root->load();
+		}
+
+		void _saveRoot() const
+		{
+			std::ofstream outf(_Dir / ROOT_FILE_NAME, std::ofstream::binary);
+			if (!outf.is_open())
+				throw std::runtime_error("Fail to create file " + ROOT_FILE_NAME);
+			Serializer<bool>::serialize(outf, _Root->isLeaf());
+			Serializer<id_type>::serialize(outf, *(_Root->_pID));
+			outf.close();
 		}
 
 		void _insertNonFull(NodePtr np, const key_type &key)
@@ -476,29 +483,65 @@ namespace lyf
 			size_t i = 0;
 			while (i != np->KeySize() && key > np->key(i))
 				i++;
-			if (i != np->KeySize())
+			if (i != np->KeySize() && key == np->key(i))
 			{
 				if (np->isLeaf())
 				{
 					np->_KeyCont.erase(np->_KeyCont.begin() + i);
 					np->save();
-					return;
 				}
 				else
 				{
 					auto p = dynamic_cast<BTreeInternalNode<key_type>*>(np.get());
-					p->_ChildPtrCont[i]->load();
-					if ((size_t sz = p->_ChildPtrCont[i]->KeySize()) >= p->_ChildPtrCont[i]->t())
+					size_t sz;
+					auto pLeftChild = p->_ChildPtrCont[i];
+					pLeftChild->load();
+					if ((sz = pLeftChild->KeySize()) >= pLeftChild->t())
 					{
-						p->_KeyCont[i] = p->_ChildPtrCont[i]->key(sz - 1);
-						_recursiveRemove(p->_ChildPtrCont[i], p->_KeyCont[i]);
+						p->_KeyCont[i] = pLeftChild->key(sz - 1);
+						_recursiveRemove(pLeftChild, p->_KeyCont[i]);
 						return;
 					}
-					else
+					auto pRightChild = p->_ChildPtrCont[i + 1];
+					pRightChild->load();
+					if ((sz = pRightChild->KeySize()) >= pRightChild->t())
 					{
-
+						p->_KeyCont[i] = pRightChild->key(0);
+						_recursiveRemove(pRightChild, p->_KeyCont[i]);
+						return;
 					}
+					pLeftChild._KeyCont.push_back(std::move(p->_KeyCont[i]));
+					for (auto &e : pRightChild->_KeyCont)
+					{
+						pLeftChild._KeyCont.push_back(std::move(e));
+					}
+					if (!(pRightChild->isLeaf()))
+					{
+						auto lp = dynamic_cast<BTreeInternalNode<key_type>*>(pLeftChild.get());
+						auto rp = dynamic_cast<BTreeInternalNode<key_type>*>(pRightChild.get());
+						for (auto &e : rp->_ChildIdCont)
+							lp->_ChildIdCont.push_back(std::move(e));
+						for (auto &e : rp->_ChildPtrCont)
+							lp->_ChildPtrCont.push_back(std::move(e));
+					}
+					pRightChild->removeFile();
+					p->_KeyCont.erase(p->_KeyCont.begin() + i);
+					p->_ChildIdCont.erase(p->_ChildIdCont.begin() + i + 1);
+					p->_ChildPtrCont.erase(p->_ChildPtrCont.begin() + i + 1);
+					p->save();
+					_recursiveRemove(pLeftChild, key);
 				}
+				return;
+			}
+			else
+			{
+				auto pChild = np->_ChildPtrCont[i];
+				pChild->load();
+				if (pChild->KeySize() < pChild->t())
+				{
+
+				}
+				_recursiveRemove(pChild, key);
 			}
 		}
 
