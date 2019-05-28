@@ -476,7 +476,7 @@ namespace lyf
 			}
 		}
 
-		void _recursiveRemove(NodePtr np, const key_type &key)
+		bool _recursiveRemove(NodePtr np, const key_type &key)
 		{
 			np->load();
 			size_t i = 0;
@@ -488,6 +488,7 @@ namespace lyf
 				{
 					np->_KeyCont.erase(np->_KeyCont.begin() + i);
 					np->save();
+					return true;
 				}
 				else
 				{
@@ -497,15 +498,13 @@ namespace lyf
 					if ((sz = pLeftChild->KeySize()) >= pLeftChild->t())
 					{
 						p->_KeyCont[i] = pLeftChild->key(sz - 1);
-						_recursiveRemove(pLeftChild, p->_KeyCont[i]);
-						return;
+						return _recursiveRemove(pLeftChild, p->_KeyCont[i]);
 					}
 					auto pRightChild = p->loadChild(i + 1);
 					if ((sz = pRightChild->KeySize()) >= pRightChild->t())
 					{
 						p->_KeyCont[i] = pRightChild->key(0);
-						_recursiveRemove(pRightChild, p->_KeyCont[i]);
-						return;
+						return _recursiveRemove(pRightChild, p->_KeyCont[i]);
 					}
 					pLeftChild._KeyCont.push_back(std::move(p->_KeyCont[i]));
 					for (auto &e : pRightChild->_KeyCont)
@@ -528,14 +527,13 @@ namespace lyf
 					if (!p->KeySize())
 					{
 						p->removeFile();
-						_Root.reset(pLeftChild);
+						_Root = pLeftChild;
 						_saveRoot();
 					}
 					else
 						p->save();
-					_recursiveRemove(pLeftChild, key);
+					return _recursiveRemove(pLeftChild, key);
 				}
-				return;
 			}
 			else if (!np->isLeaf())
 			{
@@ -545,8 +543,10 @@ namespace lyf
 				{
 
 				}
-				_recursiveRemove(pChild, key);
+				return _recursiveRemove(pChild, key);
 			}
+			else
+				return false;
 		}
 
 		path const _Dir;
