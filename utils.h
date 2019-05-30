@@ -1098,12 +1098,12 @@ namespace lyf
 				_f.open(_Path, std::fstream::out | std::fstream::trunc);
 				_f.close();
 			}
-			_open();
+			open();
 		}
 
 		~FileModifier()
 		{
-			_f.close();
+			close();
 		}
 
 		const path &getPath() const
@@ -1117,10 +1117,27 @@ namespace lyf
 			return _f.tellg();
 		}
 
+		void open()
+		{
+			_f.open(_Path, std::fstream::in | std::fstream::out | std::fstream::binary);
+			if (!_f.is_open())
+				throw std::runtime_error("Fail to open file");
+		}
+
+		void close()
+		{
+			_f.close();
+		}
+
 		void append(const char *data, size_t size)
 		{
 			_f.seekp(0, std::fstream::end);
 			_f.write(data, size);
+		}
+
+		void append(const string &data)
+		{
+			this->append(data.data(), data.size());
 		}
 
 		void insert(size_t pos, const char *data, size_t size)
@@ -1133,6 +1150,11 @@ namespace lyf
 			_f.seekp(pos);
 			_f.write(data, size);
 			_f.write(p.get(), sz);
+		}
+
+		void insert(size_t pos, const string &data)
+		{
+			this->insert(pos, data.data(), data.size());
 		}
 
 		void seekg(size_t pos)
@@ -1162,9 +1184,19 @@ namespace lyf
 			_f.write(data, size);
 		}
 
+		void write(size_t pos, const string &data)
+		{
+			this->write(pos, data.data(), data.size());
+		}
+
 		void write(const char *data, size_t size)
 		{
 			_f.write(data, size);
+		}
+
+		void write(const string &data)
+		{
+			this->write(data.data(), data.size());
 		}
 
 		void copy_append(size_t pos, size_t size, FileModifier &dst)
@@ -1190,8 +1222,9 @@ namespace lyf
 
 		void resize(size_t size)
 		{
-			_f.flush();
+			close();
 			std::filesystem::resize_file(_Path, size);
+			open();
 		}
 
 		void truncate()
@@ -1203,12 +1236,6 @@ namespace lyf
 		path const _Path;
 		std::fstream _f;
 
-		void _open()
-		{
-			_f.open(_Path, std::fstream::in | std::fstream::out | std::fstream::binary);
-			if (!_f.is_open())
-				throw std::runtime_error("Fail to open file");
-		}
 	};
 
 }
