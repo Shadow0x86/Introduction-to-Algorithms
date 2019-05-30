@@ -341,7 +341,7 @@ namespace lyf
 			{
 				pLeftChild->_KeyCont.push_back(std::move(e));
 			}
-			if (!(pRightChild->isLeaf()))
+			if (!pRightChild->isLeaf())
 			{
 				auto lp = dynamic_cast<BTreeInternalNode<key_type>*>(pLeftChild.get());
 				auto rp = dynamic_cast<BTreeInternalNode<key_type>*>(pRightChild.get());
@@ -536,8 +536,12 @@ namespace lyf
 					if (!p->KeySize())
 					{
 						p->removeFile();
-						_Root = pLeftChild;
-						_saveRoot();
+						if (np == _Root)
+						{
+							_Root = pLeftChild;
+							_saveRoot();
+						}
+						np.reset();
 					}
 					return _recursiveRemove(pLeftChild, key);
 				}
@@ -548,23 +552,28 @@ namespace lyf
 				auto pChild = p->loadChild(i);
 				if (pChild->KeySize() < pChild->t())
 				{
-					size_t sib_i = i + 1;
-					auto sibling = p->loadChild(sib_i);
-					if (sibling->KeySize() >= sibling->t())
+					size_t sib_i;
+					NodePtr sibling = nullptr;
+					if (i < p->KeySize())
 					{
-						pChild->_KeyCont.push_back(std::move(p->_KeyCont[i]));
-						p->_KeyCont[i] = std::move(sibling->_KeyCont[0]);
-						sibling->_KeyCont.erase(sibling->_KeyCont.begin());
-						if (!pChild->isLeaf())
+						size_t sib_i = i + 1;
+						auto sibling = p->loadChild(sib_i);
+						if (sibling->KeySize() >= sibling->t())
 						{
-							auto rawpc = dynamic_cast<BTreeInternalNode<key_type>*>(pChild.get());
-							auto rawsib = dynamic_cast<BTreeInternalNode<key_type>*>(sibling.get());
-							rawpc->_ChildIdCont.push_back(std::move(rawsib->_ChildIdCont[0]));
-							rawpc->_ChildPtrCont.push_back(std::move(rawsib->_ChildPtrCont[0]));
-							rawsib->_ChildIdCont.erase(rawsib->_ChildIdCont.begin());
-							rawsib->_ChildPtrCont.erase(rawsib->_ChildPtrCont.begin());
+							pChild->_KeyCont.push_back(std::move(p->_KeyCont[i]));
+							p->_KeyCont[i] = std::move(sibling->_KeyCont[0]);
+							sibling->_KeyCont.erase(sibling->_KeyCont.begin());
+							if (!pChild->isLeaf())
+							{
+								auto rawpc = dynamic_cast<BTreeInternalNode<key_type>*>(pChild.get());
+								auto rawsib = dynamic_cast<BTreeInternalNode<key_type>*>(sibling.get());
+								rawpc->_ChildIdCont.push_back(std::move(rawsib->_ChildIdCont[0]));
+								rawpc->_ChildPtrCont.push_back(std::move(rawsib->_ChildPtrCont[0]));
+								rawsib->_ChildIdCont.erase(rawsib->_ChildIdCont.begin());
+								rawsib->_ChildPtrCont.erase(rawsib->_ChildPtrCont.begin());
+							}
+							goto no_merge;
 						}
-						goto no_merge;
 					}
 					if (i)
 					{
@@ -587,16 +596,22 @@ namespace lyf
 							goto no_merge;
 						}
 					}
+					if (!sibling)
+						return false;
 					if (sib_i == i + 1)
 						p->mergeChild(i);
 					else
-						p->mergeChild(i - 1);
+						p->mergeChild(--i);
 					pChild = p->loadChild(i);
 					if (!p->KeySize())
 					{
 						p->removeFile();
-						_Root = pChild;
-						_saveRoot();
+						if (np == _Root)
+						{
+							_Root = pChild;
+							_saveRoot();
+						}
+						np.reset();
 					}
 				}
 				no_merge:
