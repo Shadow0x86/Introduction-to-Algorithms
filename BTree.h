@@ -71,6 +71,7 @@ namespace lyf
 
 		void removeFile()
 		{
+			_FileModifier.close();
 			std::filesystem::remove(_FileModifier.getPath());
 		}
 
@@ -297,7 +298,7 @@ namespace lyf
 
 		void splitChild(size_t i)
 		{
-			auto y = _ChildPtrCont[i];
+			auto y = loadChild(i);
 			child_ptr_t z;
 			auto dir = this->_FileModifier.getPath().parent_path();
 			if (y->isLeaf())
@@ -330,6 +331,31 @@ namespace lyf
 			this->save();
 			y->save();
 			z->save();
+		}
+
+		void mergeChild(size_t i)
+		{
+			auto pLeftChild = loadChild(i), pRightChild = loadChild(i + 1);
+			pLeftChild->_KeyCont.push_back(std::move(_KeyCont[i]));
+			for (auto &e : pRightChild->_KeyCont)
+			{
+				pLeftChild->_KeyCont.push_back(std::move(e));
+			}
+			if (!(pRightChild->isLeaf()))
+			{
+				auto lp = dynamic_cast<BTreeInternalNode<key_type>*>(pLeftChild.get());
+				auto rp = dynamic_cast<BTreeInternalNode<key_type>*>(pRightChild.get());
+				for (auto &e : rp->_ChildIdCont)
+					lp->_ChildIdCont.push_back(std::move(e));
+				for (auto &e : rp->_ChildPtrCont)
+					lp->_ChildPtrCont.push_back(std::move(e));
+			}
+			pRightChild->removeFile();
+			_KeyCont.erase(_KeyCont.begin() + i);
+			_ChildIdCont.erase(_ChildIdCont.begin() + i + 1);
+			_ChildPtrCont.erase(_ChildPtrCont.begin() + i + 1);
+			this->save();
+			pLeftChild->save();
 		}
 
 		void discard() override
@@ -506,32 +532,13 @@ namespace lyf
 						p->_KeyCont[i] = pRightChild->key(0);
 						return _recursiveRemove(pRightChild, p->_KeyCont[i]);
 					}
-					pLeftChild._KeyCont.push_back(std::move(p->_KeyCont[i]));
-					for (auto &e : pRightChild->_KeyCont)
-					{
-						pLeftChild._KeyCont.push_back(std::move(e));
-					}
-					if (!(pRightChild->isLeaf()))
-					{
-						auto lp = dynamic_cast<BTreeInternalNode<key_type>*>(pLeftChild.get());
-						auto rp = dynamic_cast<BTreeInternalNode<key_type>*>(pRightChild.get());
-						for (auto &e : rp->_ChildIdCont)
-							lp->_ChildIdCont.push_back(std::move(e));
-						for (auto &e : rp->_ChildPtrCont)
-							lp->_ChildPtrCont.push_back(std::move(e));
-					}
-					pRightChild->removeFile();
-					p->_KeyCont.erase(p->_KeyCont.begin() + i);
-					p->_ChildIdCont.erase(p->_ChildIdCont.begin() + i + 1);
-					p->_ChildPtrCont.erase(p->_ChildPtrCont.begin() + i + 1);
+					p->mergeChild(i);
 					if (!p->KeySize())
 					{
 						p->removeFile();
 						_Root = pLeftChild;
 						_saveRoot();
 					}
-					else
-						p->save();
 					return _recursiveRemove(pLeftChild, key);
 				}
 			}
@@ -541,8 +548,58 @@ namespace lyf
 				auto pChild = p->loadChild(i);
 				if (pChild->KeySize() < pChild->t())
 				{
-
+					size_t sib_i = i + 1;
+					auto sibling = p->loadChild(sib_i);
+					if (sibling->KeySize() >= sibling->t())
+					{
+						pChild->_KeyCont.push_back(std::move(p->_KeyCont[i]));
+						p->_KeyCont[i] = std::move(sibling->_KeyCont[0]);
+						sibling->_KeyCont.erase(sibling->_KeyCont.begin());
+						if (!pChild->isLeaf())
+						{
+							auto rawpc = dynamic_cast<BTreeInternalNode<key_type>*>(pChild.get());
+							auto rawsib = dynamic_cast<BTreeInternalNode<key_type>*>(sibling.get());
+							rawpc->_ChildIdCont.push_back(std::move(rawsib->_ChildIdCont[0]));
+							rawpc->_ChildPtrCont.push_back(std::move(rawsib->_ChildPtrCont[0]));
+							rawsib->_ChildIdCont.erase(rawsib->_ChildIdCont.begin());
+							rawsib->_ChildPtrCont.erase(rawsib->_ChildPtrCont.begin());
+						}
+						goto no_merge;
+					}
+					if (i)
+					{
+						sib_i = i - 1;
+						sibling = p->loadChild(sib_i);
+						if (sibling->KeySize() >= sibling->t())
+						{
+							pChild->_KeyCont.insert(pChild->_KeyCont.begin(), std::move(p->_KeyCont[sib_i]));
+							p->_KeyCont[sib_i] = std::move(sibling->_KeyCont.back());
+							sibling->_KeyCont.pop_back();
+							if (!pChild->isLeaf())
+							{
+								auto rawpc = dynamic_cast<BTreeInternalNode<key_type>*>(pChild.get());
+								auto rawsib = dynamic_cast<BTreeInternalNode<key_type>*>(sibling.get());
+								rawpc->_ChildIdCont.insert(rawpc->_ChildIdCont.begin(), std::move(rawsib->_ChildIdCont.back()));
+								rawpc->_ChildPtrCont.insert(rawpc->_ChildPtrCont.begin(), std::move(rawsib->_ChildPtrCont.back()));
+								rawsib->_ChildIdCont.pop_back();
+								rawsib->_ChildPtrCont.pop_back();
+							}
+							goto no_merge;
+						}
+					}
+					if (sib_i == i + 1)
+						p->mergeChild(i);
+					else
+						p->mergeChild(i - 1);
+					pChild = p->loadChild(i);
+					if (!p->KeySize())
+					{
+						p->removeFile();
+						_Root = pChild;
+						_saveRoot();
+					}
 				}
+				no_merge:
 				return _recursiveRemove(pChild, key);
 			}
 			else
