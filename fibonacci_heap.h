@@ -16,22 +16,29 @@ namespace lyf
 			using value_ptr = std::unique_ptr<_Ty>;
 
 			Node(const _Ty &value)
-				: _Value(new _Ty(value)), _Parent(nullptr),
-				_Child(nullptr), _Left(nullptr), _Right(nullptr)
+				: _pValue(new _Ty(value)), _pParent(nullptr), _Degree(0),
+				_pChild(nullptr), _pLeft(nullptr), _pRight(nullptr), _Mark(false)
 			{
 			}
 
 			Node(_Ty &&value)
-				: _Value(new _Ty(std::move(value))), _Parent(nullptr),
-				_Child(nullptr), _Left(nullptr), _Right(nullptr)
+				: _pValue(new _Ty(std::move(value))), _pParent(nullptr), _Degree(0),
+				_pChild(nullptr), _pLeft(nullptr), _pRight(nullptr), _Mark(false)
 			{
 			}
 
+			const _Ty &value() const noexcept
+			{
+				return *_pValue;
+			}
+
 			value_ptr _pValue;
-			node_ptr _Parent;
-			node_ptr _Child;
-			node_ptr _Left;
-			node_ptr _Right;
+			node_ptr _pParent;
+			node_ptr _pChild;
+			node_ptr _pLeft;
+			node_ptr _pRight;
+			size_t _Degree;
+			bool _Mark;
 		};
 
 		using value_type = _Ty;
@@ -40,22 +47,25 @@ namespace lyf
 		
 	public:
 		FibonacciHeap()
-			: _Root(nullptr)
+			: _pRoot(nullptr), _Size(0)
 		{
 		}
 
 		FibonacciHeap(FibonacciHeap &&rhs)
-			: _Root(rhs._Root)
+			: _pRoot(rhs._pRoot), _Size(rhs._Size)
 		{
-			rhs._Root = nullptr;
+			rhs._pRoot = nullptr;
+			rhs._Size = 0;
 		}
 
 		FibonacciHeap &operator=(FibonacciHeap &&rhs)
 		{
 			if (this != &rhs)
 			{
-				_Root = rhs._Root;
-				rhs._Root = nullptr;
+				_pRoot = rhs._pRoot;
+				_Size = rhs._Size;
+				rhs._pRoot = nullptr;
+				rhs._Size = 0;
 			}
 			return *this;
 		}
@@ -66,17 +76,55 @@ namespace lyf
 
 		FibonacciHeap &operator+=(FibonacciHeap &&rhs);
 
-		void insert(const value_type &value);
-		void insert(value_type &&value);
+		void insert(const value_type &value) noexcept
+		{
+			_insert_node(new Node(value));
+		}
+
+		void insert(value_type &&value) noexcept
+		{
+			_insert_node(new Node(std::move(value)));
+		}
+
 		value_ptr extract_min();
 
-		size_t size() const;
-		bool empty() const;
-		const value_type &min() const;
+		size_t size() const noexcept
+		{
+			return _Size;
+		}
+
+		bool empty() const noexcept
+		{
+			return _Size == 0;
+		}
+
+		const value_type &min() const noexcept
+		{
+			return _pRoot->value();
+		}
 
 	private:
-		node_ptr _Root;
+		node_ptr _pRoot;
+		size_t _Size;
 
+		void _insert_node(node_ptr np) noexcept
+		{
+			if (!_pRoot)
+			{
+				_pRoot = np;
+				np->_pLeft = np->_pRight = np;
+			}
+			else
+			{
+				_pRoot->_pRight->_Left = np;
+				np->_pRight = _pRoot->_pRight;
+				np->_pLeft = _pRoot;
+				_pRoot->pRight = np;
+				if (np->value() < _pRoot->value())
+					_pRoot = np;
+			}
+			_Size++;
+		}
 	};
 
 
