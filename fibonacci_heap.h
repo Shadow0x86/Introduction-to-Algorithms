@@ -39,9 +39,26 @@ namespace lyf
 		using value_ptr = typename Node::value_ptr;
 		
 	public:
-		FibonacciHeap();
-		FibonacciHeap(FibonacciHeap &&rhs);
-		FibonacciHeap &operator=(FibonacciHeap &&rhs);
+		FibonacciHeap()
+			: _Root(nullptr)
+		{
+		}
+
+		FibonacciHeap(FibonacciHeap &&rhs)
+			: _Root(rhs._Root)
+		{
+			rhs._Root = nullptr;
+		}
+
+		FibonacciHeap &operator=(FibonacciHeap &&rhs)
+		{
+			if (this != &rhs)
+			{
+				_Root = rhs._Root;
+				rhs._Root = nullptr;
+			}
+			return *this;
+		}
 
 		FibonacciHeap(const FibonacciHeap &) = delete;
 		FibonacciHeap &operator=(const FibonacciHeap &) = delete;
@@ -50,12 +67,12 @@ namespace lyf
 		FibonacciHeap &operator+=(FibonacciHeap &&rhs);
 
 		void insert(const value_type &value);
+		void insert(value_type &&value);
 		value_ptr extract_min();
 
 		size_t size() const;
 		bool empty() const;
 		const value_type &min() const;
-		bool contains(const value_type &value) const;
 
 	private:
 		node_ptr _Root;
@@ -64,5 +81,10 @@ namespace lyf
 
 
 	template<class _Ty>
-	FibonacciHeap<_Ty> operator+(const FibonacciHeap<_Ty> &lhs, const FibonacciHeap<_Ty> &rhs);
+	FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs)
+	{
+		FibonacciHeap<_Ty> ret(std::move(lhs));
+		ret += std::move(rhs);
+		return ret;
+	}
 }
