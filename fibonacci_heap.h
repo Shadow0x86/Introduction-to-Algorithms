@@ -8,11 +8,11 @@ namespace lyf
 	template<class _Ty>
 	class FibonacciHeap
 	{
-	public:
+	private:
 
 		struct Node
 		{
-			using node_ptr = std::shared_ptr<_Ty>;
+			using node_ptr = Node *;
 			using value_ptr = std::unique_ptr<_Ty>;
 
 			Node(const _Ty &value)
@@ -41,6 +41,7 @@ namespace lyf
 			bool _Mark;
 		};
 
+	public:
 		using value_type = _Ty;
 		using node_ptr = typename Node::node_ptr;
 		using value_ptr = typename Node::value_ptr;
@@ -58,6 +59,8 @@ namespace lyf
 			rhs._Size = 0;
 		}
 
+		~FibonacciHeap();
+
 		FibonacciHeap &operator=(FibonacciHeap &&rhs)
 		{
 			if (this != &rhs)
@@ -74,7 +77,30 @@ namespace lyf
 		FibonacciHeap &operator=(const FibonacciHeap &) = delete;
 		FibonacciHeap &operator+=(const FibonacciHeap &rhs) = delete;
 
-		FibonacciHeap &operator+=(FibonacciHeap &&rhs);
+		FibonacciHeap &operator+=(FibonacciHeap &&rhs)
+		{
+			if (this != &rhs)
+			{
+				if (_pRoot && rhs._pRoot)
+				{
+					_pRoot->_pRight->_pLeft = rhs._pRoot->_pLeft;
+					rhs._pRoot->_pLeft->_pRight = _pRoot->_pRight;
+					_pRoot->_pRight = rhs._pRoot;
+					rhs._pRoot->_pLeft = _pRoot;
+				}
+				if (!_pRoot || (rhs._pRoot && rhs.min() < min()))
+					_pRoot = rhs._pRoot;
+				_Size += rhs._Size;
+				rhs._pRoot = nullptr;
+				rhs._Size = 0;
+			}
+			return *this;
+		}
+
+		FibonacciHeap &merge(FibonacciHeap &&rhs)
+		{
+			return (*this) += std::move(rhs);
+		}
 
 		void insert(const value_type &value) noexcept
 		{
@@ -132,7 +158,6 @@ namespace lyf
 	FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs)
 	{
 		FibonacciHeap<_Ty> ret(std::move(lhs));
-		ret += std::move(rhs);
-		return ret;
+		return ret += std::move(rhs);
 	}
 }

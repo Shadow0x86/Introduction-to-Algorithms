@@ -675,7 +675,7 @@ namespace lyf
 #if _DEBUG
 			np->_reset_neighbors();
 			np->_setCont();
-			np._reset();
+			np.reset();
 #else
 			delete np;
 #endif
