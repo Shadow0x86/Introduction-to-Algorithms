@@ -418,11 +418,10 @@ namespace lyf
 			if (np->isFull())
 			{
 				auto p = new BTreeInternalNode<key_type>(_Dir, np->isLeaf());
-				_Root.reset(p);
 				p->_ChildIdCont.push_back(np->_pID);
 				p->_ChildPtrCont.push_back(np);
 				p->splitChild(0);
-				_saveRoot();
+				_updateRoot(p);
 				_insertNonFull(_Root, key);
 			}
 			else
@@ -460,8 +459,7 @@ namespace lyf
 			}
 			else
 			{
-				_Root.reset(new BTreeLeafNode<key_type>(_Dir));
-				_saveRoot();
+				_updateRoot(new BTreeLeafNode<key_type>(_Dir));
 			}
 			_Root->load();
 		}
@@ -474,6 +472,18 @@ namespace lyf
 			Serializer<bool>::serialize(outf, _Root->isLeaf());
 			Serializer<id_type>::serialize(outf, *(_Root->_pID));
 			outf.close();
+		}
+
+		void _updateRoot(Node *_pNewRoot)
+		{
+			_Root.reset(_pNewRoot);
+			_saveRoot();
+		}
+
+		void _updateRoot(NodePtr _pNewRoot)
+		{
+			_Root = _pNewRoot;
+			_saveRoot();
 		}
 
 		void _insertNonFull(NodePtr np, const key_type &key)
@@ -538,8 +548,7 @@ namespace lyf
 						p->removeFile();
 						if (np == _Root)
 						{
-							_Root = pLeftChild;
-							_saveRoot();
+							_updateRoot(pLeftChild);
 						}
 						np.reset();
 					}
@@ -608,8 +617,7 @@ namespace lyf
 						p->removeFile();
 						if (np == _Root)
 						{
-							_Root = pChild;
-							_saveRoot();
+							_updateRoot(pChild);
 						}
 						np.reset();
 					}
