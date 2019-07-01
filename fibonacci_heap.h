@@ -120,6 +120,12 @@ namespace lyf
 				node_ptr cp = np->_pChild;
 				if (cp)
 				{
+					node_ptr curr = cp;
+					do
+					{
+						curr->_pParent = nullptr;
+						curr = curr->_pRight;
+					} while (curr != cp);
 					_concatenate_childs(np, cp);
 				}
 				np->_pLeft->_pRight = np->_pRight;
@@ -158,6 +164,15 @@ namespace lyf
 	private:
 		node_ptr _pRoot;
 		size_t _Size;
+
+		void _destory_childs(node_ptr np)
+		{
+			node_ptr cp = np->_pChild, curr = cp, next;
+			if (cp)
+			{
+
+			}
+		}
 
 		void _concatenate_childs(node_ptr lc, node_ptr rc) noexcept
 		{
