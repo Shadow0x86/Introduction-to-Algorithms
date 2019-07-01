@@ -77,19 +77,18 @@ namespace lyf
 		FibonacciHeap &operator=(const FibonacciHeap &) = delete;
 		FibonacciHeap &operator+=(const FibonacciHeap &rhs) = delete;
 
-		FibonacciHeap &operator+=(FibonacciHeap &&rhs)
+		FibonacciHeap &operator+=(FibonacciHeap &&rhs) noexcept
 		{
 			if (this != &rhs)
 			{
 				if (_pRoot && rhs._pRoot)
 				{
-					_pRoot->_pRight->_pLeft = rhs._pRoot->_pLeft;
-					rhs._pRoot->_pLeft->_pRight = _pRoot->_pRight;
-					_pRoot->_pRight = rhs._pRoot;
-					rhs._pRoot->_pLeft = _pRoot;
+					_concatenate_childs(_pRoot, rhs._pRoot);
 				}
 				if (!_pRoot || (rhs._pRoot && rhs.min() < min()))
+				{
 					_pRoot = rhs._pRoot;
+				}
 				_Size += rhs._Size;
 				rhs._pRoot = nullptr;
 				rhs._Size = 0;
@@ -97,7 +96,7 @@ namespace lyf
 			return *this;
 		}
 
-		FibonacciHeap &merge(FibonacciHeap &&rhs)
+		FibonacciHeap &merge(FibonacciHeap &&rhs) noexcept
 		{
 			return (*this) += std::move(rhs);
 		}
@@ -112,7 +111,34 @@ namespace lyf
 			_insert_node(new Node(std::move(value)));
 		}
 
-		value_ptr extract_min();
+		value_ptr extract_min() noexcept
+		{
+			auto np = _pRoot;
+			value_ptr ret = nullptr;
+			if (np)
+			{
+				node_ptr cp = np->_pChild;
+				if (cp)
+				{
+					_concatenate_childs(np, cp);
+				}
+				np->_pLeft->_pRight = np->_pRight;
+				np->_pRight->_pLeft = np->_pLeft;
+				if (np == np->_pRight)
+				{
+					_pRoot = nullptr;
+				}
+				else
+				{
+					_pRoot = np->_pRight;
+					_consolidate();
+				}
+				_Size--;
+				ret = std::move(np->_pValue);
+				delete np;
+			}
+			return ret;
+		}
 
 		size_t size() const noexcept
 		{
@@ -133,6 +159,14 @@ namespace lyf
 		node_ptr _pRoot;
 		size_t _Size;
 
+		void _concatenate_childs(node_ptr lc, node_ptr rc) noexcept
+		{
+			lc->_pRight->_pLeft = rc->_pLeft;
+			rc->_pLeft->_pRight = lc->_pRight;
+			lc->_pRight = rc;
+			rc->_pLeft = lc;
+		}
+
 		void _insert_node(node_ptr np) noexcept
 		{
 			if (!_pRoot)
@@ -151,11 +185,16 @@ namespace lyf
 			}
 			_Size++;
 		}
+
+		void _consolidate()
+		{
+
+		}
 	};
 
 
 	template<class _Ty>
-	FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs)
+	FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs) noexcept
 	{
 		FibonacciHeap<_Ty> ret(std::move(lhs));
 		return ret += std::move(rhs);
