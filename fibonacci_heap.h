@@ -27,6 +27,20 @@ namespace lyf
 			{
 			}
 
+			~Node()
+			{
+				if (_pChild)
+				{
+					node_ptr curr = _pChild;
+					do
+					{
+						node_ptr next = curr->_pRight;
+						delete curr;
+						curr = next;
+					} while (curr != _pChild);
+				}
+			}
+
 			const _Ty &value() const noexcept
 			{
 				return *_pValue;
@@ -59,7 +73,10 @@ namespace lyf
 			rhs._Size = 0;
 		}
 
-		~FibonacciHeap();
+		~FibonacciHeap()
+		{
+			delete _pRoot;
+		}
 
 		FibonacciHeap &operator=(FibonacciHeap &&rhs)
 		{
@@ -164,15 +181,6 @@ namespace lyf
 	private:
 		node_ptr _pRoot;
 		size_t _Size;
-
-		void _destory_childs(node_ptr np)
-		{
-			node_ptr cp = np->_pChild, curr = cp, next;
-			if (cp)
-			{
-
-			}
-		}
 
 		void _concatenate_childs(node_ptr lc, node_ptr rc) noexcept
 		{
