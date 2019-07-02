@@ -257,6 +257,7 @@ namespace lyf
 						_remove_node(y);
 						_insert_node_after(y, x->_pChild);
 						x->_Degree++;
+						y->_pParent = x;
 						y->_Mark = false;
 						roots[d] = nullptr;
 						d++;
