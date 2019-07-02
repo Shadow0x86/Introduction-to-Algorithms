@@ -1,4 +1,5 @@
 #pragma once
+#include <cmath>
 #include "utils.h"
 
 
@@ -120,12 +121,12 @@ namespace lyf
 
 		void insert(const value_type &value) noexcept
 		{
-			_insert_node(new Node(value));
+			_insert_new_node(new Node(value));
 		}
 
 		void insert(value_type &&value) noexcept
 		{
-			_insert_node(new Node(std::move(value)));
+			_insert_new_node(new Node(std::move(value)));
 		}
 
 		value_ptr extract_min() noexcept
@@ -145,8 +146,7 @@ namespace lyf
 					} while (curr != cp);
 					_concatenate_childs(np, cp);
 				}
-				np->_pLeft->_pRight = np->_pRight;
-				np->_pRight->_pLeft = np->_pLeft;
+				_remove_node(np);
 				if (np == np->_pRight)
 				{
 					_pRoot = nullptr;
@@ -166,6 +166,11 @@ namespace lyf
 		size_t size() const noexcept
 		{
 			return _Size;
+		}
+
+		size_t max_degree() const noexcept
+		{
+			return log(_Size) / 0.481191 + 1;
 		}
 
 		bool empty() const noexcept
@@ -190,7 +195,13 @@ namespace lyf
 			rc->_pLeft = lc;
 		}
 
-		void _insert_node(node_ptr np) noexcept
+		void _remove_node(node_ptr np) noexcept
+		{
+			np->_pLeft->_pRight = np->_pRight;
+			np->_pRight->_pLeft = np->_pLeft;
+		}
+
+		void _insert_new_node(node_ptr np) noexcept
 		{
 			if (!_pRoot)
 			{
@@ -209,9 +220,63 @@ namespace lyf
 			_Size++;
 		}
 
-		void _consolidate()
+		void _insert_node_after(node_ptr np, node_ptr &sibling) noexcept
 		{
+			if (!sibling)
+			{
+				sibling = np;
+			}
+			else
+			{
+				sibling->_pRight->_Left = np;
+				np->_pRight = sibling->_pRight;
+				np->_pLeft = sibling;
+				sibling->pRight = np;
+			}
+		}
 
+		void _consolidate() noexcept
+		{
+			std::vector<node_ptr> roots(max_degree(), nullptr);
+			node_ptr r = _pRoot, curr = r;
+			if (r)
+			{
+				do
+				{
+					node_ptr x = curr;
+					size_t d = x->_Degree;
+					while (roots[d])
+					{
+						node_ptr y = roots[d];
+						if (x->value() > y->value())
+						{
+							auto tmp = y;
+							y = x;
+							x = tmp;
+						}
+						_remove_node(y);
+						_insert_node_after(y, x->_pChild);
+						x->_Degree++;
+						y->_Mark = false;
+						roots[d] = nullptr;
+						d++;
+					}
+					roots[d] = x;
+					curr = curr->_pRight;
+				} while (curr != r);
+			}
+			_pRoot = nullptr;
+			for (auto np : roots)
+			{
+				if (np)
+				{
+					_insert_node_after(np, _pRoot);
+					if (np->value() < _pRoot->value())
+					{
+						_pRoot = np;
+					}
+				}
+			}
 		}
 	};
 
