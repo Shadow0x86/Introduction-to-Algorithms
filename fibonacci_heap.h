@@ -305,9 +305,9 @@ namespace lyf
 
 
 	template<class _Ty>
-	FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs) noexcept
+	inline FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs)
 	{
 		FibonacciHeap<_Ty> ret(std::move(lhs));
-		return ret += std::move(rhs);
+		return std::move(ret += std::move(rhs));
 	}
 }
