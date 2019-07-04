@@ -103,7 +103,7 @@ namespace lyf
 				{
 					_concatenate_childs(_pRoot, rhs._pRoot);
 				}
-				if (!_pRoot || (rhs._pRoot && rhs.min() < min()))
+				if (!_pRoot || (rhs._pRoot && rhs.minimum() < minimum()))
 				{
 					_pRoot = rhs._pRoot;
 				}
@@ -178,7 +178,7 @@ namespace lyf
 			return _Size == 0;
 		}
 
-		const value_type &min() const noexcept
+		const value_type &minimum() const noexcept
 		{
 			return _pRoot->value();
 		}
@@ -210,10 +210,10 @@ namespace lyf
 			}
 			else
 			{
-				_pRoot->_pRight->_Left = np;
+				_pRoot->_pRight->_pLeft = np;
 				np->_pRight = _pRoot->_pRight;
 				np->_pLeft = _pRoot;
-				_pRoot->pRight = np;
+				_pRoot->_pRight = np;
 				if (np->value() < _pRoot->value())
 					_pRoot = np;
 			}
