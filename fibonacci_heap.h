@@ -156,6 +156,7 @@ namespace lyf
 					_concatenate_childs(np, cp);
 				}
 				_remove_node(np);
+				np->_pChild = nullptr;
 				if (np == np->_pRight)
 				{
 					_pRoot = nullptr;
@@ -247,6 +248,8 @@ namespace lyf
 
 		void _consolidate() noexcept
 		{
+			if (!size())
+				return;
 			std::vector<node_ptr> roots(max_degree(), nullptr);
 			node_ptr r = _pRoot, curr = r;
 			if (r)
@@ -267,6 +270,10 @@ namespace lyf
 						if (y == r)
 						{
 							r = r->_pRight;
+						}
+						if (y == next)
+						{
+							next = next->_pRight;
 						}
 						_remove_node(y);
 						_insert_node_after(y, x->_pChild);
