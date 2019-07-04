@@ -76,7 +76,16 @@ namespace lyf
 
 		~FibonacciHeap()
 		{
-			delete _pRoot;
+			if (_pRoot)
+			{
+				node_ptr curr = _pRoot;
+				do
+				{
+					node_ptr next = curr->_pRight;
+					delete curr;
+					curr = next;
+				} while (curr != _pRoot);
+			}
 		}
 
 		FibonacciHeap &operator=(FibonacciHeap &&rhs)
@@ -154,9 +163,9 @@ namespace lyf
 				else
 				{
 					_pRoot = np->_pRight;
-					_consolidate();
 				}
 				_Size--;
+				_consolidate();
 				ret = std::move(np->_pValue);
 				delete np;
 			}
@@ -225,13 +234,14 @@ namespace lyf
 			if (!sibling)
 			{
 				sibling = np;
+				np->_pLeft = np->_pRight = np;
 			}
 			else
 			{
-				sibling->_pRight->_Left = np;
+				sibling->_pRight->_pLeft = np;
 				np->_pRight = sibling->_pRight;
 				np->_pLeft = sibling;
-				sibling->pRight = np;
+				sibling->_pRight = np;
 			}
 		}
 
@@ -243,7 +253,7 @@ namespace lyf
 			{
 				do
 				{
-					node_ptr x = curr;
+					node_ptr x = curr, next = curr->_pRight;
 					size_t d = x->_Degree;
 					while (roots[d])
 					{
@@ -254,6 +264,10 @@ namespace lyf
 							y = x;
 							x = tmp;
 						}
+						if (y == r)
+						{
+							r = r->_pRight;
+						}
 						_remove_node(y);
 						_insert_node_after(y, x->_pChild);
 						x->_Degree++;
@@ -263,7 +277,7 @@ namespace lyf
 						d++;
 					}
 					roots[d] = x;
-					curr = curr->_pRight;
+					curr = next;
 				} while (curr != r);
 			}
 			_pRoot = nullptr;
@@ -272,6 +286,7 @@ namespace lyf
 				if (np)
 				{
 					_insert_node_after(np, _pRoot);
+					np->_pParent = nullptr;
 					if (np->value() < _pRoot->value())
 					{
 						_pRoot = np;
