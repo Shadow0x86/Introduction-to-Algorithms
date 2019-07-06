@@ -62,12 +62,12 @@ namespace lyf
 		using value_ptr = typename Node::value_ptr;
 		
 	public:
-		FibonacciHeap()
+		FibonacciHeap() noexcept
 			: _pRoot(nullptr), _Size(0)
 		{
 		}
 
-		FibonacciHeap(FibonacciHeap &&rhs)
+		FibonacciHeap(FibonacciHeap &&rhs) noexcept
 			: _pRoot(rhs._pRoot), _Size(rhs._Size)
 		{
 			rhs._pRoot = nullptr;
@@ -88,7 +88,7 @@ namespace lyf
 			}
 		}
 
-		FibonacciHeap &operator=(FibonacciHeap &&rhs)
+		FibonacciHeap &operator=(FibonacciHeap &&rhs) noexcept
 		{
 			if (this != &rhs)
 			{
@@ -305,7 +305,7 @@ namespace lyf
 
 
 	template<class _Ty>
-	inline FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs)
+	inline FibonacciHeap<_Ty> operator+(FibonacciHeap<_Ty> &&lhs, FibonacciHeap<_Ty> &&rhs) noexcept
 	{
 		FibonacciHeap<_Ty> ret(std::move(lhs));
 		return std::move(ret += std::move(rhs));
